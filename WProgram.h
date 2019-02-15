@@ -14,6 +14,7 @@ static bool read(int a, unsigned char* b, int c) { return false; };
 static bool open(char* a, int b) { return false;  }
 #define O_RDONLY 0
 static void usleep(int a) {};
+static void yield() {};
 #define FIONREAD 0
 #else
 #include <unistd.h>
