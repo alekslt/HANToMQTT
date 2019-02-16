@@ -7,15 +7,45 @@
   #include "WProgram.h"
 #endif
 
-
+#include <vector>
+#include <ArduinoJson.h>
 #include "DlmsReader.h"
 
+struct ClockDeviation {
+	char dateTime[20];
+	uint16_t deviation;
+	byte clockStatus;
+};
+
+struct Element {
+	byte dataType;
+	byte stringLength;
+	union Value {
+		char* value_string;
+		uint32_t value_uint;
+		int32_t value_int;
+		float value_float;
+		ClockDeviation* value_dateTime;
+	} value;
+};
+
+struct ObisElement {
+	byte* obisOctets;
+	Element* data;
+	uint8_t enumType;
+
+	void debugString(char* buf);
+	void toArduinoJson(JsonObject& json);
+	
+	void Reset();
+};
 
 class HanReader
 {
 public:
 	const uint8_t dataHeader = 8;
 	bool compensateFor09HeaderBug = false;
+	std::vector<ObisElement*> cosemObjectList;
 
 	HanReader();
 	void setup(HardwareSerial *hanPort);
@@ -24,12 +54,9 @@ public:
 	bool read();
 	bool read(byte data);
 	int getListSize();
-	time_t getPackageTime();
-	int getInt(int objectId);
-	String getString(int objectId);
-	time_t getTime(int objectId);
 
 private:
+	uint8_t debugLevel = 2;
 	Stream *debug;
 	HardwareSerial *han;
 	byte buffer[512];
@@ -40,15 +67,10 @@ private:
 	int userDataLen;
 
 	void printObjectStart(uint16_t pos);
-	int findValuePosition(int dataPosition, byte *buffer, int start, int length);
-	bool decodeListElement(uint16_t pos, uint16_t& nextPos);
-
-	time_t getTime(int dataPosition, byte *buffer, int start, int length);
-	time_t getTime(byte *buffer, int start, int length);
-	int getInt(int dataPosition, byte *buffer, int start, int length);
-	String getString(int dataPosition, byte *buffer, int start, int length);
-
-	time_t toUnixTime(int year, int month, int day, int hour, int minute, int second);
+	bool decodeClockAndDeviation(byte* buf, ClockDeviation& element);
+	bool decodeAndApplyScalerElement(uint16_t& nextPos, ObisElement* element);
+	bool decodeDataElement(uint16_t& nextPos, Element& element);
+	bool decodeListElement(uint16_t& nextPos, ObisElement* obisElement);
 
 	void debugPrint(byte *buffer, int start, int length);
 };

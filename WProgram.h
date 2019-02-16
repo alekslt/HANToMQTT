@@ -104,9 +104,9 @@ class HardwareSerial : public Stream
 {
 public:
 	int fd;
-	int msgPos = 0;
+	uint32_t msgPos = 0;
 	uint32_t elements;
-	int msgLen = 44;
+	uint32_t msgLen = 44;
 	unsigned char message[512];
 
 	void begin(unsigned long baudrate, SerialConfig config) {
@@ -119,6 +119,8 @@ public:
 		if (this->msgPos < this->elements) {
 			return true;
 		} else {
+			this->msgPos = 0;
+			//sleep(1000);
 			return false;
 		}
 
@@ -154,7 +156,7 @@ public:
 		const char *pos = test_list3;
 		/* WARNING: no sanitization or error-checking whatsoever */
 		uint32_t stringLength = strlen(test_list3);
-		elements = round((stringLength+1) / 3);
+		elements = (uint32_t)round((stringLength+1) / 3);
 		//elements += 2;
 		for (size_t count = 0; count < elements; count++) {
 			sscanf(pos, "%2hhx", &this->message[count]);

@@ -1,8 +1,10 @@
 
 #include <inttypes.h>
 
+#include <ArduinoJson.h>
+
 #include "HanReader.h"
-#include "Aidon.h"
+//#include "Aidon.h"
 
 uint8_t open_serial(char* a, int b, char* c) { return 0; }
 
@@ -23,12 +25,39 @@ int main(int argc, char *argv[]) {
 			printf("\n");
 			printf("List size: %d: ", listSize);
 
-			// Only care for the ACtive Power Imported, which is found in the first list
-			if (listSize == (int)Aidon::List1)
-			{
-				int power = hanReader.getInt((int)Aidon_List1::ActivePowerImported);
-				printf("Power consumtion is right now: %d W\n", power);
+			// Define a json object to keep the data
+			StaticJsonBuffer<4096> jsonBuffer;
+			JsonObject& root = jsonBuffer.createObject();
+
+			// Any generic useful info here
+			root["id"] = "espdebugger";
+			//root["up"] = millis();
+			//root["t"] = time;
+
+			// Add a sub-structure to the json object, 
+			// to keep the data from the meter itself
+			JsonArray& data = root.createNestedArray("data");
+
+			char buf[128];
+
+			for (auto&& elem : hanReader.cosemObjectList) { // access by forwarding reference, the type of i is int&
+				//elem->debugString(buf);
+				//printf("%s\n", buf);
+				JsonObject& jsonElem = data.createNestedObject();
+				elem->toArduinoJson(jsonElem);
+				elem->Reset();
+				delete elem;
 			}
+			hanReader.cosemObjectList.clear();
+
+			// Write the json to the debug port
+			//root.printTo(Serial1);
+			//Serial1.println("");
+
+			// Publish the json to the MQTT server
+			char msg[1024];
+			root.printTo(msg, 1024);
+			Serial1.println(msg);
 		}
 		fflush(stdout);
 	}

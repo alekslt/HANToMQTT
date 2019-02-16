@@ -1,5 +1,6 @@
 #include "HanReader.h"
 #include <map>
+#include <ArduinoJson.h>
 
 #ifdef _WIN32
 #include <math.h>
@@ -16,8 +17,88 @@ const byte TYPE_INT16 = 0x10;
 const byte TYPE_UINT16 = 0x12;
 const byte TYPE_ENUM = 0x16;
 const byte TYPE_FLOAT = 0x17;
+const byte TYPE_DATETIME = 0xf0; // Standard states that future interfaces will use date_time = 25(dec)
 
 std::map<int, String> cosemTypeToString;
+std::map<byte, String> cosemEnumTypeToString;
+
+const byte kObisCodeSize = 0x06;
+const byte kObisClockAndDeviation[] = { 0x00, 0x00, 0x01, 0x00, 0x00, 0xff };
+
+void ObisElement::debugString(char* buf) {
+	sprintf(buf, "Object: ObisCode:%d.%d.%d.%d.%d.%d  Type:%x(%s) Value: ",
+		this->obisOctets[0], this->obisOctets[1], this->obisOctets[2],
+		this->obisOctets[3], this->obisOctets[4], this->obisOctets[5],
+		this->data->dataType, cosemTypeToString[this->data->dataType].c_str());
+
+	size_t bufLen = strlen(buf);
+	switch (this->data->dataType) {
+	case TYPE_FLOAT:
+		sprintf(&buf[bufLen], "%f %s", this->data->value.value_float, cosemEnumTypeToString[this->enumType].c_str());
+		break;
+	case TYPE_UINT32:
+		sprintf(&buf[bufLen], "%u %s", this->data->value.value_uint, cosemEnumTypeToString[this->enumType].c_str());
+		break;
+
+	case TYPE_STRING:
+		sprintf(&buf[bufLen], "%.*s", this->data->stringLength, this->data->value.value_string);
+		break;
+
+	case TYPE_DATETIME:
+		sprintf(&buf[bufLen], "%s Dev:%d ClockStatus: %u", this->data->value.value_dateTime->dateTime,
+			this->data->value.value_dateTime->deviation, this->data->value.value_dateTime->clockStatus);
+		break;
+	}
+}
+
+void ObisElement::toArduinoJson(JsonObject& json) {
+	char buf[64];
+	sprintf(buf, "%d.%d.%d.%d.%d.%d",
+		this->obisOctets[0], this->obisOctets[1], this->obisOctets[2],
+		this->obisOctets[3], this->obisOctets[4], this->obisOctets[5]);
+
+	json["obis_code"] = string(buf);
+
+	switch (this->data->dataType) {
+	case TYPE_FLOAT:
+		json["value"] = this->data->value.value_float;
+		json["type"] = cosemEnumTypeToString[this->enumType];
+		break;
+	case TYPE_UINT32:
+		json["value"] = this->data->value.value_uint;
+		json["type"] = cosemEnumTypeToString[this->enumType];
+		break;
+
+	case TYPE_STRING:
+		sprintf(buf, "%.*s", this->data->stringLength, this->data->value.value_string);
+		json["value"] = string(buf);
+
+		break;
+
+	case TYPE_DATETIME:
+		json["value"] = string(this->data->value.value_dateTime->dateTime);
+		json["deviation"] = this->data->value.value_dateTime->deviation;
+		json["clockStatus"] = this->data->value.value_dateTime->clockStatus;
+		break;
+	}
+}
+
+void ObisElement::Reset() {
+	if (this->data->dataType == TYPE_DATETIME &&
+		this->data->value.value_dateTime != NULL) {
+
+		delete this->data->value.value_dateTime;
+	}
+	this->data->value.value_uint = 0;
+	this->data->dataType = 0;
+	this->data->stringLength = 0;
+	delete this->data;
+
+	this->enumType = 0;
+	this->obisOctets = 0;
+}
+
+
 
 HanReader::HanReader()
 {
@@ -29,7 +110,18 @@ HanReader::HanReader()
 	cosemTypeToString[TYPE_INT8] = String("TYPE_INT8");
 	cosemTypeToString[TYPE_INT16] = String("TYPE_INT16");
 	cosemTypeToString[TYPE_UINT16] = String("TYPE_UINT16");
+	cosemTypeToString[TYPE_FLOAT] = String("TYPE_FLOAT");
 	cosemTypeToString[TYPE_ENUM] = String("TYPE_ENUM");
+
+	cosemEnumTypeToString[27] = String("W");
+	cosemEnumTypeToString[28] = String("VA");
+	cosemEnumTypeToString[29] = String("var");
+	cosemEnumTypeToString[30] = String("Wh");
+	cosemEnumTypeToString[31] = String("VAh");
+	cosemEnumTypeToString[32] = String("varh");
+	cosemEnumTypeToString[33] = String("A");
+	cosemEnumTypeToString[34] = String("C");
+	cosemEnumTypeToString[35] = String("V");
 }
 
 void HanReader::setup(HardwareSerial *hanPort, unsigned long baudrate, SerialConfig config, Stream *debugPort)
@@ -57,8 +149,6 @@ void HanReader::setup(HardwareSerial *hanPort, Stream *debugPort)
 	setup(hanPort, 2400, SERIAL_8E1, debugPort);
 }
 
-
-
 void HanReader::printObjectStart(uint16_t pos) {
 	byte dataType = userData[pos];
 	debug->print("Datatype@");
@@ -72,26 +162,130 @@ void HanReader::printObjectStart(uint16_t pos) {
 	debug->println(userData[pos + 1], HEX);
 }
 
-struct obis_element {
-	byte* obisOctets;
-	byte dataType;
-	byte stringLength;
-	union Value {
-		char* value_string;
-		uint32_t value_uint;
-		int32_t value_int;
-		float value_float;
-	} value;
-	uint8_t enumType;
-};
+bool HanReader::decodeClockAndDeviation(byte* buf, ClockDeviation& element) {
 
-bool HanReader::decodeListElement(uint16_t pos, uint16_t& nextPos)
+	uint16_t year = buf[0] << 8 | buf[1];
+
+	uint8_t month = buf[2];
+	uint8_t day = buf[3];
+	uint8_t dayOfWeek = buf[4];
+	uint8_t hour = buf[5];
+	uint8_t minute = buf[6];
+	uint8_t second = buf[7];
+	uint8_t hundreths = buf[8]; // Can be 0xFF if not used
+
+	sprintf(element.dateTime, "%04u.%02u.%02uT%02u:%02u:%02u", year, month, day, hour, minute, second);
+	element.deviation = buf[9] << 8 | buf[10];
+	element.clockStatus = buf[11];
+
+	return true;
+}
+
+bool HanReader::decodeDataElement(uint16_t& nextPos, Element& element) {
+	if (debugLevel > 1) printObjectStart(nextPos);
+	element.dataType = userData[nextPos];
+	uint8_t valueLength = userData[nextPos + 1];
+	if (element.dataType == TYPE_UINT32) {
+		element.value.value_uint = userData[nextPos + 1] << 24 | userData[nextPos + 2] << 16 | userData[nextPos + 3] << 8 | userData[nextPos + 4];
+		nextPos += 5;
+	}
+	else if (element.dataType == TYPE_STRING) {
+		element.stringLength = valueLength;
+		element.value.value_string = (char*)&userData[nextPos + 2];
+		nextPos += 2 + valueLength;
+	}
+	else if (element.dataType == TYPE_UINT16) {
+		element.value.value_uint = userData[nextPos + 1] << 8 | userData[nextPos + 2];
+		nextPos += 3;
+	}
+	else if (element.dataType == TYPE_INT16) {
+		element.value.value_int = userData[nextPos + 1] << 8 | userData[nextPos + 2];
+		nextPos += 3;
+	}
+	else if (element.dataType == TYPE_OCTET_STRING) {
+		element.stringLength = valueLength;
+		element.value.value_string = (char*)&userData[nextPos + 2];
+		nextPos += 2 + valueLength;
+	}
+	else {
+		return false;
+	}
+
+	return true;
+}
+
+
+bool HanReader::decodeAndApplyScalerElement(uint16_t& nextPos, ObisElement* obisElement) {
+	int8_t scaler;
+
+	if (debugLevel > 1) printObjectStart(nextPos);
+	uint8_t scaleValStructType = userData[nextPos];
+	uint8_t scaleValStructElements = userData[nextPos + 1];
+	if (scaleValStructType != TYPE_STRUCTURE || scaleValStructElements != 2) {
+		debug->println("ScaleVal Struct element is invalid. Expected 0x02(TYPE_STRUCTURE) and elements 0x02");
+		return false;
+	}
+	nextPos += 2;
+
+	if (debugLevel > 1) printObjectStart(nextPos);
+	uint8_t scalerType = userData[nextPos];
+	if (scalerType == TYPE_INT8) {
+		scaler = userData[nextPos + 1];
+		int a = 34;
+		nextPos += 2;
+	}
+	else {
+		debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM");
+		return false;
+	}
+
+	if (debugLevel > 1) printObjectStart(nextPos);
+	uint8_t enumType = userData[nextPos];
+	if (enumType == TYPE_ENUM) {
+		obisElement->enumType = userData[nextPos + 1];
+		nextPos += 2;
+	}
+	else {
+		debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM. Got Type:");
+		debug->print(enumType, HEX);
+		debug->print("(");
+		debug->print(cosemTypeToString[enumType].c_str());
+		debug->println(")");
+		return false;
+	}
+
+	if (scaler < 0) {
+		if (obisElement->data->dataType == TYPE_UINT32 || obisElement->data->dataType == TYPE_UINT16) {
+			obisElement->data->value.value_float = (float)(obisElement->data->value.value_uint * pow(10, scaler));
+			obisElement->data->dataType = TYPE_FLOAT;
+		}
+		else if (/*obisElement->data->dataType == TYPE_INT32 || */obisElement->data->dataType == TYPE_INT16) {
+			obisElement->data->value.value_float = (float)(obisElement->data->value.value_int * pow(10, scaler));
+			obisElement->data->dataType = TYPE_FLOAT;
+		}
+	}
+	else {
+		if (obisElement->data->dataType == TYPE_UINT32 || obisElement->data->dataType == TYPE_UINT16) {
+			obisElement->data->value.value_uint = (uint32_t)(obisElement->data->value.value_uint * pow(10, scaler));
+		}
+		else if (/*dataElement->dataType == TYPE_INT32 || */obisElement->data->dataType == TYPE_INT16) {
+			obisElement->data->value.value_int = (int32_t)(obisElement->data->value.value_int * pow(10, scaler));
+		}
+	}
+
+	return true;
+}
+
+bool HanReader::decodeListElement(uint16_t& nextPos, ObisElement* obisElement)
 {
-	obis_element element;
+	Element* dataElement = new Element();
+
+	if (debugLevel > 0) printObjectStart(nextPos);
+
 	// Expect two or three elements. obis, value, [scaleval]
-	byte dataType = userData[pos];
-	uint8_t elements = userData[pos + 1];
-	nextPos = pos + 2;
+	byte dataType = userData[nextPos];
+	uint8_t elements = userData[nextPos + 1];
+	nextPos += 2;
 
 	if (dataType != TYPE_STRUCTURE) {
 		debug->print("Object with invalid type. Expected 0x02(TYPE_STRUCTURE) got ");
@@ -100,10 +294,10 @@ bool HanReader::decodeListElement(uint16_t pos, uint16_t& nextPos)
 		return false;
 	}
 
-	printObjectStart(nextPos);
+	if (debugLevel > 1) printObjectStart(nextPos);
 	uint8_t obisType = userData[nextPos];
 	uint8_t obisLength = userData[nextPos + 1];
-	if (obisType != TYPE_OCTET_STRING || obisLength != 6) {
+	if (obisType != TYPE_OCTET_STRING || obisLength != kObisCodeSize) {
 		debug->print("OBIS element is invalid. Expected 0x09(OCTET_STRING) and length 0x06 got type:");
 		debug->print(obisType, HEX);
 		debug->print("(");
@@ -112,151 +306,37 @@ bool HanReader::decodeListElement(uint16_t pos, uint16_t& nextPos)
 		debug->println(obisLength, HEX);
 		return false;
 	}
-	byte* obis_code = &(userData[nextPos + 2]);
+	obisElement->obisOctets = &(userData[nextPos + 2]);
 	nextPos += 8;
 	
-	element.obisOctets = obis_code;
-
-	printObjectStart(nextPos);
-	uint8_t valueType = userData[nextPos];
-	uint8_t valueLength = userData[nextPos + 1];
-	if (valueType == TYPE_UINT32) {
-		element.value.value_uint = userData[nextPos + 1] << 24 | userData[nextPos + 2] << 16 | userData[nextPos + 3] << 8 | userData[nextPos + 4];
-		nextPos += 5;
-	}
-	else if (valueType == TYPE_STRING) {
-		element.stringLength = valueLength;
-		element.value.value_string = (char*)&userData[nextPos + 2];
-		nextPos += 2+ valueLength;
-	}
-	else if (valueType == TYPE_UINT16) {
-		element.value.value_uint = userData[nextPos + 1] << 8 | userData[nextPos + 2];
-		nextPos += 3;
-	}
-	else if (valueType == TYPE_INT16) {
-		element.value.value_int = userData[nextPos + 1] << 8 | userData[nextPos + 2];
-		nextPos += 3;
-	}
-	else if (valueType == TYPE_OCTET_STRING) {
-		element.value.value_string = (char*)&userData[nextPos + 2];
-		nextPos += 2 + valueLength;
-	}
-
-	element.dataType = valueType;
-	
-	if (elements == 3) {
-		int8_t scaler;
-
-		printObjectStart(nextPos);
-		uint8_t scaleValStructType = userData[nextPos];
-		uint8_t scaleValStructElements = userData[nextPos+1];
-		if (scaleValStructType != TYPE_STRUCTURE || scaleValStructElements != 2) {
-			debug->println("ScaleVal Struct element is invalid. Expected 0x02(TYPE_STRUCTURE) and elements 0x02");
-			return false;
-		}
-		nextPos += 2;
-
-		printObjectStart(nextPos);
-		uint8_t scalerType = userData[nextPos];
-		if (scalerType == TYPE_INT8) {
-			scaler =userData[nextPos+1];
-			int a = 34;
-			nextPos += 2;
-		}
-		else {
-			debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM");
-			return false;
-		}
-
-		printObjectStart(nextPos);
-		uint8_t enumType = userData[nextPos];
-		if (enumType == TYPE_ENUM) {
-			element.enumType = userData[nextPos+1];
-			nextPos += 2;
-		}
-		else {
-			debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM. Got Type:");
-			debug->print(enumType, HEX);
-			debug->print("(");
-			debug->print(cosemTypeToString[enumType].c_str());
-			debug->println(")");
-			return false;
-		}
-
-		if (scaler < 0) {
-			if (valueType == TYPE_UINT32 || valueType == TYPE_UINT16) {
-				element.value.value_float = element.value.value_uint * pow(10, scaler);
-				element.dataType = TYPE_FLOAT;
-			}
-			else if (/*valueType == TYPE_INT32 || */valueType == TYPE_INT16) {
-				element.value.value_float = element.value.value_int * pow(10, scaler);
-				element.dataType = TYPE_FLOAT;
-			}
-		}
-		else {
-			if (valueType == TYPE_UINT32 || valueType == TYPE_UINT16) {
-				element.value.value_uint = element.value.value_uint * pow(10, scaler);
-			}
-			else if (/*valueType == TYPE_INT32 || */valueType == TYPE_INT16) {
-				element.value.value_int = element.value.value_int * pow(10, scaler);
-			}
-		}
-	}
-	char buf[255];
-	sprintf(buf, "Object: ObisCode:%d.%d.%d.%d.%d.%d  Type:%x(%s) Value: ",
-		element.obisOctets[0], element.obisOctets[1], element.obisOctets[2],
-		element.obisOctets[3], element.obisOctets[4], element.obisOctets[5],
-		element.dataType, cosemTypeToString[element.dataType].c_str());
-
-	/*
-	debug->print("Object: ObisCode:");
-	debug->print(element.obisOctets[0]);
-	debug->print(".");
-	debug->print(element.obisOctets[1]);
-	debug->print(".");
-	debug->print(element.obisOctets[2]);
-	debug->print(".");
-	debug->print(element.obisOctets[3]);
-	debug->print(".");
-	debug->print(element.obisOctets[4]);
-	debug->print(".");
-	debug->print(element.obisOctets[5]);
-	debug->print(" Type:");
-	debug->print(element.dataType, HEX);
-	debug->print("(");
-	debug->print(cosemTypeToString[element.dataType].c_str());
-	debug->print(") Value: ");
-	*/
-	uint8_t bufLen = strlen(buf);
-	switch (element.dataType) {
-	case TYPE_FLOAT:
-		sprintf(&buf[bufLen], "%f", element.value.value_float);
-		//debug->print(element.value.value_float);
-		break;
-	case TYPE_UINT32:
-		sprintf(&buf[bufLen], "%u", element.value.value_uint);
-		//debug->print(element.value.value_uint);
-		break;
-
-	case TYPE_STRING:
-		sprintf(&buf[bufLen], "%.*s", element.stringLength, element.value.value_string);
-		//debug->print(element.value.value_uint);
-		break;
-	}
-	debug->println(buf);
-	/*
-	if (obisType != TYPE_OCTET_STRING || obisLength != 6) {
-		debug->print("OBIS element is invalid. Expected 0x09(OCTET_STRING) and length 0x06 got type:");
-		debug->print(obisType, HEX);
-		debug->print("(");
-		debug->print(cosemTypeToString[obisType].c_str());
-		debug->print(") and length:");
-		debug->println(obisLength, HEX);
+	if (!decodeDataElement(nextPos, *dataElement)) {
 		return false;
-	}*/
+	}
 
+	obisElement->data = dataElement;
+
+	// Handle conversion of time sent in an octet string type
+	if (obisElement->data->dataType == TYPE_OCTET_STRING && obisElement->data->stringLength == 0x0c &&
+		memcmp(obisElement->obisOctets, kObisClockAndDeviation, kObisCodeSize) == 0) {
+		ClockDeviation* clockDeviation = new ClockDeviation();
+		if (decodeClockAndDeviation((byte*)obisElement->data->value.value_string, *clockDeviation)) {
+			obisElement->data->value.value_dateTime = clockDeviation;
+			obisElement->data->dataType = TYPE_DATETIME;
+		}
+		else {
+			delete clockDeviation;
+		}
+
+	}
+
+	if (elements == 3) {
+		decodeAndApplyScalerElement(nextPos, obisElement);
+	}
+
+	char buf[255];
+	obisElement->debugString(buf);
+	debug->println(buf);
 	return true;
-
 }
 
 bool HanReader::read(byte data)
@@ -302,28 +382,27 @@ bool HanReader::read(byte data)
 		int firstStructurePos = 9;
 		byte dataType = userData[firstStructurePos];
 		uint8_t listLength = userData[firstStructurePos+1];
-		if (debug)
-		{
-			printObjectStart(firstStructurePos);
-		}
+
 		if (dataType != TYPE_LIST)
 		{
 			if (debug) debug->println("Error. We expect the root element to be a list.");
 			return false;
 		}
-		int curPos = firstStructurePos + 2;
+		uint16_t curPos = firstStructurePos + 2;
 		for (int listItemIndex = 0; listItemIndex < listLength; listItemIndex++) {
-			printObjectStart(curPos);
 
-			uint16_t nextPos;
-			if (decodeListElement(curPos, nextPos)) {
-				curPos = nextPos;
+			ObisElement* obisElement = new ObisElement();
+			if (decodeListElement(curPos, obisElement)) {
+				this->cosemObjectList.push_back(obisElement);
+			} else {
+				obisElement->Reset();
+				delete obisElement;
 			}
-			
 		}
-		listSize = getInt(0, buffer, 0, bytesRead);
+		listSize = listLength;
 		return true;
 	}
+	return false;
 }
 
 void HanReader::debugPrint(byte *buffer, int start, int length)
@@ -357,176 +436,4 @@ bool HanReader::read()
 int HanReader::getListSize()
 {
 	return listSize;
-}
-
-time_t HanReader::getPackageTime()
-{
-	int packageTimePosition = dataHeader 
-		+ (compensateFor09HeaderBug ? 1 : 0);
-
-	return getTime(buffer, packageTimePosition, bytesRead);
-}
-
-time_t HanReader::getTime(int objectId)
-{
-	return getTime(objectId, buffer, 0, bytesRead);
-}
-
-int HanReader::getInt(int objectId)
-{
-	return getInt(objectId, buffer, 0, bytesRead);
-}
-
-String HanReader::getString(int objectId)
-{
-	return getString(objectId, buffer, 0, bytesRead);
-}
-
-
-int HanReader::findValuePosition(int dataPosition, byte *buffer, int start, int length)
-{
-	// The first byte after the header gives the length 
-	// of the extended header information (variable)
-	int headerSize = dataHeader + (compensateFor09HeaderBug ? 1 : 0);
-	int firstData = headerSize + buffer[headerSize] + 1;
-
-	for (int i = start + firstData; i<length; i++)
-	{
-		if (dataPosition-- == 0)
-			return i;
-		else if (buffer[i] == 0x0A) // OBIS code value
-			i += buffer[i + 1] + 1;
-		else if (buffer[i] == 0x09) // string value
-			i += buffer[i + 1] + 1;
-		else if (buffer[i] == 0x02) // byte value (1 byte)
-			i += 1;
-		else if (buffer[i] == 0x12) // integer value (2 bytes)
-			i += 2;
-		else if (buffer[i] == 0x06) // integer value (4 bytes)
-			i += 4;
-		else
-		{
-			if (debug)
-			{
-				debug->print("Unknown data type found: 0x");
-				debug->println(buffer[i], HEX);
-			}
-			return 0; // unknown data type found
-		}
-	}
-
-	if (debug)
-	{
-		debug->print("Passed the end of the data. Length was: ");
-		debug->println(length);
-	}
-
-	return 0;
-}
-
-
-time_t HanReader::getTime(int dataPosition, byte *buffer, int start, int length)
-{
-	// TODO: check if the time is represented always as a 12 byte string (0x09 0x0C)
-	int timeStart = findValuePosition(dataPosition, buffer, start, length);
-	timeStart += 1;
-	return getTime(buffer, start + timeStart, length - timeStart);
-}
-
-time_t HanReader::getTime(byte *buffer, int start, int length)
-{
-	int pos = start;
-	int dataLength = buffer[pos++];
-
-	if (dataLength == 0x0C)
-	{
-		int year = buffer[pos] << 8 |
-			buffer[pos + 1];
-
-		int month = buffer[pos + 2];
-		int day = buffer[pos + 3];
-		int hour = buffer[pos + 5];
-		int minute = buffer[pos + 6];
-		int second = buffer[pos + 7];
-
-		return toUnixTime(year, month, day, hour, minute, second);
-	}
-	else
-	{
-		// Date format not supported
-		return (time_t)0L;
-	}
-}
-
-int HanReader::getInt(int dataPosition, byte *buffer, int start, int length)
-{
-	int valuePosition = findValuePosition(dataPosition, buffer, start, length);
-
-	if (valuePosition > 0)
-	{
-		int value = 0;
-		int bytes = 0;
-		switch (buffer[valuePosition++])
-		{
-			case 0x12: 
-				bytes = 2;
-				break;
-			case 0x06:
-				bytes = 4;
-				break;
-			case 0x02:
-				bytes = 1;
-				break;
-		}
-
-		for (int i = valuePosition; i < valuePosition + bytes; i++)
-		{
-			value = value << 8 | buffer[i];
-		}
-
-		return value;
-	}
-	return 0;
-}
-
-String HanReader::getString(int dataPosition, byte *buffer, int start, int length)
-{
-	int valuePosition = findValuePosition(dataPosition, buffer, start, length);
-	if (valuePosition > 0)
-	{
-		String value = String("");
-		for (int i = valuePosition + 2; i < valuePosition + buffer[valuePosition + 1] + 2; i++)
-		{
-			value += String((const char*)buffer[i]);
-		}
-		return value;
-	}
-	return String("");
-}
-
-time_t HanReader::toUnixTime(int year, int month, int day, int hour, int minute, int second)
-{
-	byte daysInMonth[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-	long secondsPerMinute = 60;
-	long secondsPerHour = secondsPerMinute * 60;
-	long secondsPerDay = secondsPerHour * 24;
-
-	long time = (year - 1970) * secondsPerDay * 365L;
-
-	for (int yearCounter = 1970; yearCounter<year; yearCounter++)
-		if ((yearCounter % 4 == 0) && ((yearCounter % 100 != 0) || (yearCounter % 400 == 0)))
-			time += secondsPerDay;
-
-	if (month > 2 && (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0)))
-		time += secondsPerDay;
-
-	for (int monthCounter = 1; monthCounter<month; monthCounter++)
-		time += daysInMonth[monthCounter - 1] * secondsPerDay;
-
-	time += (day - 1) * secondsPerDay;
-	time += hour * secondsPerHour;
-	time += minute * secondsPerMinute;
-	time += second;
-
-	return (time_t)time;
 }
