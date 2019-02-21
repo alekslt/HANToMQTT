@@ -15,6 +15,8 @@ static bool open(char* a, int b) { return false;  }
 #define O_RDONLY 0
 static void usleep(int a) {};
 static void yield() {};
+static void delay(uint32_t w) { }
+static uint32_t system_get_free_heap_size() { return 0; }
 #define FIONREAD 0
 #else
 #include <unistd.h>
@@ -119,7 +121,7 @@ public:
 		if (this->msgPos < this->elements) {
 			return true;
 		} else {
-			this->msgPos = 0;
+			//this->msgPos = 0;
 			//sleep(1000);
 			return false;
 		}

@@ -1,29 +1,21 @@
 #include "HanReader.h"
-#include <map>
 #include <ArduinoJson.h>
+#include <map>
 
 #ifdef _WIN32
 #include <math.h>
+#else
+extern "C" {
+#include "user_interface.h"
+}
 #endif
 
-const byte TYPE_LIST = 0x01;
-const byte TYPE_STRUCTURE = 0x02;
 
-const byte TYPE_UINT32 = 0x06;
-const byte TYPE_OCTET_STRING = 0x09;
-const byte TYPE_STRING = 0x0a;
-const byte TYPE_INT8 = 0x0f;
-const byte TYPE_INT16 = 0x10;
-const byte TYPE_UINT16 = 0x12;
-const byte TYPE_ENUM = 0x16;
-const byte TYPE_FLOAT = 0x17;
-const byte TYPE_DATETIME = 0xf0; // Standard states that future interfaces will use date_time = 25(dec)
+
+// http://www.cs.ru.nl/~marko/onderwijs/bss/SmartMeter/Excerpt_BB7.pdf
 
 std::map<int, String> cosemTypeToString;
 std::map<byte, String> cosemEnumTypeToString;
-
-const byte kObisCodeSize = 0x06;
-const byte kObisClockAndDeviation[] = { 0x00, 0x00, 0x01, 0x00, 0x00, 0xff };
 
 void ObisElement::debugString(char* buf) {
 	sprintf(buf, "Object: ObisCode:%d.%d.%d.%d.%d.%d  Type:%x(%s) Value: ",
@@ -51,13 +43,54 @@ void ObisElement::debugString(char* buf) {
 	}
 }
 
+String ObisElement::EnumString() {
+  auto search = cosemEnumTypeToString.find(this->enumType);
+  if (search != cosemEnumTypeToString.end()) {
+    return search->second;
+  } else {
+    return cosemTypeToString[this->data->dataType];
+  }
+}
+
+String ObisElement::ValueString() {
+  char buf[64];
+  switch (this->data->dataType) {
+  case TYPE_FLOAT:
+    sprintf(buf, "%f", this->data->value.value_float);
+    break;
+    
+  case TYPE_UINT32:
+    sprintf(buf, "%u", this->data->value.value_uint);
+    break;
+
+  case TYPE_STRING:
+    sprintf(buf, "%.*s", this->data->stringLength, this->data->value.value_string);
+    break;
+
+  case TYPE_DATETIME:
+    return String(this->data->value.value_dateTime->dateTime);
+    break;
+  }
+  
+  return String(buf);
+}
+
+String ObisElement::ObisCodeString() {
+  char buf[64];
+  sprintf(buf, "%d.%d.%d.%d.%d.%d",
+    this->obisOctets[0], this->obisOctets[1], this->obisOctets[2],
+    this->obisOctets[3], this->obisOctets[4], this->obisOctets[5]);
+
+    return String(buf);
+}
+
 void ObisElement::toArduinoJson(JsonObject& json) {
 	char buf[64];
 	sprintf(buf, "%d.%d.%d.%d.%d.%d",
 		this->obisOctets[0], this->obisOctets[1], this->obisOctets[2],
 		this->obisOctets[3], this->obisOctets[4], this->obisOctets[5]);
 
-	json["obis_code"] = string(buf);
+	json["obis_code"] = String(buf);
 
 	switch (this->data->dataType) {
 	case TYPE_FLOAT:
@@ -71,12 +104,12 @@ void ObisElement::toArduinoJson(JsonObject& json) {
 
 	case TYPE_STRING:
 		sprintf(buf, "%.*s", this->data->stringLength, this->data->value.value_string);
-		json["value"] = string(buf);
+		json["value"] = String(buf);
 
 		break;
 
 	case TYPE_DATETIME:
-		json["value"] = string(this->data->value.value_dateTime->dateTime);
+		json["value"] = String(this->data->value.value_dateTime->dateTime);
 		json["deviation"] = this->data->value.value_dateTime->deviation;
 		json["clockStatus"] = this->data->value.value_dateTime->clockStatus;
 		break;
@@ -100,43 +133,51 @@ void ObisElement::Reset() {
 
 
 
-HanReader::HanReader()
-{
-	cosemTypeToString[TYPE_LIST] = String("TYPE_LIST");
-	cosemTypeToString[TYPE_STRUCTURE] = String("TYPE_STRUCTURE");
-	cosemTypeToString[TYPE_UINT32] = String("TYPE_UINT32");
-	cosemTypeToString[TYPE_OCTET_STRING] = String("TYPE_OCTET_STRING");
-	cosemTypeToString[TYPE_STRING] = String("TYPE_STRING");
-	cosemTypeToString[TYPE_INT8] = String("TYPE_INT8");
-	cosemTypeToString[TYPE_INT16] = String("TYPE_INT16");
-	cosemTypeToString[TYPE_UINT16] = String("TYPE_UINT16");
-	cosemTypeToString[TYPE_FLOAT] = String("TYPE_FLOAT");
-	cosemTypeToString[TYPE_ENUM] = String("TYPE_ENUM");
+HanReader::HanReader() {
+  debugLevel = 2;
+}
 
-	cosemEnumTypeToString[27] = String("W");
-	cosemEnumTypeToString[28] = String("VA");
-	cosemEnumTypeToString[29] = String("var");
-	cosemEnumTypeToString[30] = String("Wh");
-	cosemEnumTypeToString[31] = String("VAh");
-	cosemEnumTypeToString[32] = String("varh");
-	cosemEnumTypeToString[33] = String("A");
-	cosemEnumTypeToString[34] = String("C");
-	cosemEnumTypeToString[35] = String("V");
+void HanReader::Init() {
+  cosemTypeToString[TYPE_LIST] = String("TYPE_LIST");
+  cosemTypeToString[TYPE_STRUCTURE] = String("TYPE_STRUCTURE");
+  cosemTypeToString[TYPE_UINT32] = String("TYPE_UINT32");
+  cosemTypeToString[TYPE_OCTET_STRING] = String("TYPE_OCTET_STRING");
+  cosemTypeToString[TYPE_STRING] = String("TYPE_STRING");
+  cosemTypeToString[TYPE_INT8] = String("TYPE_INT8");
+  cosemTypeToString[TYPE_INT16] = String("TYPE_INT16");
+  cosemTypeToString[TYPE_UINT16] = String("TYPE_UINT16");
+  cosemTypeToString[TYPE_FLOAT] = String("TYPE_FLOAT");
+  cosemTypeToString[TYPE_ENUM] = String("TYPE_ENUM");
+  cosemTypeToString[TYPE_DATETIME] = String("TYPE_DATETIME");
+
+  cosemEnumTypeToString[27] = String("W");
+  cosemEnumTypeToString[28] = String("VA");
+  cosemEnumTypeToString[29] = String("var");
+  cosemEnumTypeToString[30] = String("Wh");
+  cosemEnumTypeToString[31] = String("VAh");
+  cosemEnumTypeToString[32] = String("varh");
+  cosemEnumTypeToString[33] = String("A");
+  cosemEnumTypeToString[34] = String("C");
+  cosemEnumTypeToString[35] = String("V");
 }
 
 void HanReader::setup(HardwareSerial *hanPort, unsigned long baudrate, SerialConfig config, Stream *debugPort)
 {
+  Init();
+  
 	// Initialize H/W serial port for MBus communication
 	if (hanPort != NULL)
 	{
-		hanPort->begin(baudrate, config);
+		//hanPort->begin(baudrate, config);
 		while (!hanPort) {}
 	}
 	
 	han = hanPort;
 	bytesRead = 0;
 	debug = debugPort;
-	if (debug) debug->println("MBUS serial setup complete");
+  reader.debug = debugPort;
+  reader.debugLevel = debugLevel;
+  reader.netLog = netLog;
 }
 
 void HanReader::setup(HardwareSerial *hanPort)
@@ -151,15 +192,17 @@ void HanReader::setup(HardwareSerial *hanPort, Stream *debugPort)
 
 void HanReader::printObjectStart(uint16_t pos) {
 	byte dataType = userData[pos];
-	debug->print("Datatype@");
-	debug->print(pos, HEX);
-	debug->print(":");
-	debug->print(dataType, HEX);
-	debug->print("(");
-	debug->print(cosemTypeToString[dataType].c_str());
-	debug->print(")");
-	debug->print(", Elements:");
-	debug->println(userData[pos + 1], HEX);
+  if (debug) { 
+  	debug->print("Datatype@");
+  	debug->print(pos, HEX);
+  	debug->print(":");
+  	debug->print(dataType, HEX);
+  	debug->print("(");
+  	debug->print(cosemTypeToString[dataType].c_str());
+  	debug->print(")");
+  	debug->print(", Elements:");
+  	debug->println(userData[pos + 1], HEX);
+  }
 }
 
 bool HanReader::decodeClockAndDeviation(byte* buf, ClockDeviation& element) {
@@ -182,7 +225,7 @@ bool HanReader::decodeClockAndDeviation(byte* buf, ClockDeviation& element) {
 }
 
 bool HanReader::decodeDataElement(uint16_t& nextPos, Element& element) {
-	if (debugLevel > 1) printObjectStart(nextPos);
+	if (debugLevel > 2) printObjectStart(nextPos);
 	element.dataType = userData[nextPos];
 	uint8_t valueLength = userData[nextPos + 1];
 	if (element.dataType == TYPE_UINT32) {
@@ -218,39 +261,40 @@ bool HanReader::decodeDataElement(uint16_t& nextPos, Element& element) {
 bool HanReader::decodeAndApplyScalerElement(uint16_t& nextPos, ObisElement* obisElement) {
 	int8_t scaler;
 
-	if (debugLevel > 1) printObjectStart(nextPos);
+	if (debugLevel > 2) printObjectStart(nextPos);
 	uint8_t scaleValStructType = userData[nextPos];
 	uint8_t scaleValStructElements = userData[nextPos + 1];
 	if (scaleValStructType != TYPE_STRUCTURE || scaleValStructElements != 2) {
-		debug->println("ScaleVal Struct element is invalid. Expected 0x02(TYPE_STRUCTURE) and elements 0x02");
+    if (debug) debug->println("ScaleVal Struct element is invalid. Expected 0x02(TYPE_STRUCTURE) and elements 0x02");
 		return false;
 	}
 	nextPos += 2;
 
-	if (debugLevel > 1) printObjectStart(nextPos);
+	if (debugLevel > 2) printObjectStart(nextPos);
 	uint8_t scalerType = userData[nextPos];
 	if (scalerType == TYPE_INT8) {
 		scaler = userData[nextPos + 1];
-		int a = 34;
 		nextPos += 2;
 	}
 	else {
-		debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM");
+    if (debug) debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM");
 		return false;
 	}
 
-	if (debugLevel > 1) printObjectStart(nextPos);
+	if (debugLevel > 2) printObjectStart(nextPos);
 	uint8_t enumType = userData[nextPos];
 	if (enumType == TYPE_ENUM) {
 		obisElement->enumType = userData[nextPos + 1];
 		nextPos += 2;
 	}
 	else {
-		debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM. Got Type:");
-		debug->print(enumType, HEX);
-		debug->print("(");
-		debug->print(cosemTypeToString[enumType].c_str());
-		debug->println(")");
+    if (debug) { 
+  		debug->println("ScaleVal Struct element is invalid. Expected TYPE_INT8 and TYPE_ENUM. Got Type:");
+  		debug->print(enumType, HEX);
+  		debug->print("(");
+  		debug->print(cosemTypeToString[enumType].c_str());
+  		debug->println(")");
+    }
 		return false;
 	}
 
@@ -286,29 +330,33 @@ bool HanReader::decodeListElement(uint16_t& nextPos, ObisElement* obisElement)
 	byte dataType = userData[nextPos];
 	uint8_t elements = userData[nextPos + 1];
 	nextPos += 2;
-
+  
 	if (dataType != TYPE_STRUCTURE) {
-		debug->print("Object with invalid type. Expected 0x02(TYPE_STRUCTURE) got ");
-		debug->print(dataType, HEX);
-		debug->println(cosemTypeToString[dataType].c_str());
+    if (debug) { 
+  		debug->print("Object with invalid type. Expected 0x02(TYPE_STRUCTURE) got ");
+  		debug->print(dataType, HEX);
+  		debug->println(cosemTypeToString[dataType].c_str());
+    }
 		return false;
 	}
 
-	if (debugLevel > 1) printObjectStart(nextPos);
+	if (debugLevel > 2) printObjectStart(nextPos);
 	uint8_t obisType = userData[nextPos];
 	uint8_t obisLength = userData[nextPos + 1];
 	if (obisType != TYPE_OCTET_STRING || obisLength != kObisCodeSize) {
-		debug->print("OBIS element is invalid. Expected 0x09(OCTET_STRING) and length 0x06 got type:");
-		debug->print(obisType, HEX);
-		debug->print("(");
-		debug->print(cosemTypeToString[obisType].c_str());
-		debug->print(") and length:");
-		debug->println(obisLength, HEX);
+    if (debug) { 
+  		debug->print("OBIS element is invalid. Expected 0x09(OCTET_STRING) and length 0x06 got type:");
+  		debug->print(obisType, HEX);
+  		debug->print("(");
+  		debug->print(cosemTypeToString[obisType].c_str());
+  		debug->print(") and length:");
+  		debug->println(obisLength, HEX);
+    }
 		return false;
 	}
 	obisElement->obisOctets = &(userData[nextPos + 2]);
 	nextPos += 8;
-	
+
 	if (!decodeDataElement(nextPos, *dataElement)) {
 		return false;
 	}
@@ -333,9 +381,9 @@ bool HanReader::decodeListElement(uint16_t& nextPos, ObisElement* obisElement)
 		decodeAndApplyScalerElement(nextPos, obisElement);
 	}
 
-	char buf[255];
-	obisElement->debugString(buf);
-	debug->println(buf);
+	//char buf[255];
+	//obisElement->debugString(buf);
+	//debug->println(buf);
 	return true;
 }
 
@@ -343,11 +391,14 @@ bool HanReader::read(byte data)
 {
 	if (reader.Read(data))
 	{
-		printf("Got Message\n");
-		bytesRead = reader.GetRawData(buffer, 0, 512);
+		if (debug) debug->println("Got message");
+    if (debug) { debug->print("Free heap left: ");debug->println(system_get_free_heap_size()); }
+		//bytesRead = reader.GetRawData(buffer, 0, 512);
 
 		bool retUserBufferSuccess = reader.GetUserDataBuffer(userData, userDataLen);
 		if (retUserBufferSuccess == false) {
+      if (netLog) netLog("Error. Could not get APDU buffer");
+      if (debug) debug->print("Error. Could not get APDU buffer");
 			return false;
 		}
 		
@@ -390,7 +441,9 @@ bool HanReader::read(byte data)
 		}
 		uint16_t curPos = firstStructurePos + 2;
 		for (int listItemIndex = 0; listItemIndex < listLength; listItemIndex++) {
-
+      if (debug) debug->print("Decoding element: ");
+      if (debug) debug->println(listItemIndex);
+      
 			ObisElement* obisElement = new ObisElement();
 			if (decodeListElement(curPos, obisElement)) {
 				this->cosemObjectList.push_back(obisElement);

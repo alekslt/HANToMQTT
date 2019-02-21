@@ -1,204 +1,440 @@
 /*
- * Simple sketch to read MBus data from electrical meter
- * As the protocol requires "Even" parity, and this is
- * only supported on the hardware port of the ESP8266,
- * we'll have to use Serial1 for debugging.
+ * PowerMeter HAN-port to MQTT program
+ * WRT, Roar Fredriksen.
+ * We are required to use the hardware serial 
+ * on the esp8266 as we need the even-parity support.
+ * Serial1 can be used for low level debugging,
+ * but I will also use a debug-mqtt topic.
  * 
- * This means you'll have to program the ESP using the 
- * regular RX/TX port, and then you must remove the FTDI
- * and connect the MBus signal from the meter to the
- * RS pin. The FTDI/RX can be moved to Pin2 for debugging
+ * (Re)Programming should be done using OTA.
  * 
- * Created 14. september 2017 by Roar Fredriksen
+ * Notes
+ * 1. PubSubClient is included in the project due as I require to enlarge the buffer used and
+ *    the Arduino IDE does not allow for an easy way to do this currently by setting a define here.
+ *    The headers are compiled before this unit.
+ * 2. Regarding the above. Currently we have enough RAM to not care about using both a string buffer to
+ *    format the message and another for mqtt to send.
+ *    
+ * Aleksander Lygren Toppe
+ * 2019.02.17
+ * GPL? Public Domain? MIT?
  */
 
-#include <ESP8266WiFi.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
+
+////////////////////////////////
+// Headers /////////////////////
+////////////////////////////////
+#include <map>
+//#include <set>
+
+extern "C" {
+#include "user_interface.h"
+}
+
+#include <ESP8266WiFi.h> // Wifi
+#include <EEPROM.h> // ??
+#include <ArduinoOTA.h> // For OTA Programming
+#include <NTPClient.h> // For NTP Wall Clock Time Syncronization
+#include <WiFiUdp.h> // For NTP Wall Clock Time Syncronization
+
+#include <ArduinoJson.h> // json
+
+#define MQTT_MAX_PACKET_SIZE 512
+#include "PubSubClient.h" // MQTT
+
 #include "HanReader.h"
-//#include "Kaifa.h"
+
+// Configuration - Sensitive defines/passwords/adresses
+#include "secret.h"
+
+////////////////////////////////
+// Variables that you need to //
+// change to make things work //
+// for you. ////////////////////
+////////////////////////////////
+#define USE_ARDUINO_OTA
+#define OTA_HOSTNAME "esp-powermeter-test1"
+#define OTA_PASSWORD CONFIG_OTA_PASSWORD
+
+// WiFi
+const char* ssid = CONFIG_WIFI_SSID;
+const char* password = CONFIG_WIFI_PASSWORD;
+
+// MQTT
+#define MQTT_SERVER      CONFIG_MQTT_SERVER
+#define MQTT_SERVERPORT  CONFIG_MQTT_SERVERPORT                   // 8883 for MQTTS
+#define MQTT_USERNAME    ""
+#define MQTT_KEY         ""
+#define MQTT_MYNAME      OTA_HOSTNAME" Client"
+
+#define power_topic         "kdg/sensors/powermeterhan/obis"
+#define power_topic_command "kdg/sensors/powermeterhan/commands"
+#define power_topic_debug   "kdg/sensors/powermeterhan/debug"
+
+// NTP
+#define NTP_SERVER      CONFIG_NTP_SERVER
+
+#define REPORTING_DEBUG_PERIOD 1000
+
+////////////////////////////////
+// Forward declerations ////////
+////////////////////////////////
+void onMqttMessage(char* topic, byte* payload, unsigned int length);
+
+////////////////////////////////
+// Complex Variables
+////////////////////////////////
+HardwareSerial* debugger = NULL;
 
 // The HAN Port reader
+//DlmsReader reader;
 HanReader hanReader;
+//HanReaderTest hanTest;
 
-// WiFi and MQTT endpoints
-const char* ssid     = "Roar_Etne";
-const char* password = "**********";
-const char* mqtt_server = "192.168.10.203";
+HardwareSerial* hanPort;
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+// Wifi and MQTT
+WiFiClientSecure espClient;
+PubSubClient mqttClient(espClient);
+
+// NTP
+WiFiUDP ntpUDP;
+NTPClient timeClient(
+  ntpUDP,     // Connect using this UDP implementation
+  NTP_SERVER, // Connect to this server
+  0,          // 0 seconds timezone offset
+  6000        // Update every 60sec
+  );
+
+unsigned long now;
+unsigned long lastUpdate = 0;
+
+
+std::map<String, bool> obisCodesSeen;
+
+//bool fncomp (byte* lhs, byte* rhs) {return memcmp(lhs, rhs, kObisCodeSize) == 0;}
+//bool(*fn_pt)(byte*,byte*) = fncomp;
+//std::set<byte*,bool(*)(byte*,byte*)> obisSet (fn_pt);
+
+////////////////////////////////
+// Setup - Entry point /////////
+////////////////////////////////
 
 void setup() {
   setupDebugPort();
   setupWiFi();
+  setupOTA();
+  setupNTPClient();
   setupMqtt();
+  setupHAN();
+}
+
+void loop() {
+  loopOTA();
+  loopNTPClient();
+  loopMqtt();
+  loopHAN();
+
+  now = millis();
+  if ((unsigned long)(now - lastUpdate) >= REPORTING_DEBUG_PERIOD) {   
+    lastUpdate = now;
+    uint32_t freeHeap = system_get_free_heap_size();
+    char buf[64];
+    sprintf(buf, "Free heap: %u", freeHeap); 
+    //mqttClient.publish(power_topic_debug, buf);
+  }
+  delay(10);
+}
+
+
+
+char mqttLogBuf[256];
+void mqttLogger(const char *fmt, ...) {
+  va_list argptr;
+  va_start(argptr, fmt);
+  vsnprintf(mqttLogBuf, 256, fmt, argptr);
+  va_end(argptr);
+  mqttClient.publish(power_topic_debug, mqttLogBuf);
+}
+
+
+void setupDebugPort() {
+  // Uncomment to debug over the same port as used for HAN communication
+  //debugger = &Serial;
   
-  // initialize the HanReader
-  // (passing Serial as the HAN port and Serial1 for debugging)
-  hanReader.setup(&Serial, &Serial1);
-}
-
-void setupMqtt()
-{
-  client.setServer(mqtt_server, 1883);
-}
-
-void setupDebugPort()
-{
+  // initialize serial communication at 9600 bits per second:
+  //Serial.begin(115200); //115200 2400
+  //Serial.println("Serial debugging port initialized");
   // Initialize the Serial1 port for debugging
   // (This port is fixed to Pin2 of the ESP8266)
-  Serial1.begin(115200);
-  while (!Serial1) {}
-  Serial1.setDebugOutput(true);
+  //Serial1.begin(115200);
+  //while (!Serial1) {}
+  //Serial1.setDebugOutput(true);
   Serial1.println("Serial1");
-  Serial1.println("Serial debugging port initialized");
+  Serial1.println("Serial1 debugging port initialized");
 }
 
-void setupWiFi()
-{
+void setupWiFi() {
   // Initialize wifi
-  Serial1.print("Connecting to ");
-  Serial1.println(ssid);
+  if (debugger) debugger->print("Connecting to ");
+  if (debugger) debugger->println(ssid);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial1.print(".");
+    if (debugger) debugger->print(".");
   }
 
-  Serial1.println("");
-  Serial1.println("WiFi connected");
-  Serial1.println("IP address: ");
-  Serial1.println(WiFi.localIP());
+  if (debugger) {
+    debugger->println("");
+    debugger->println("WiFi connected");
+    debugger->println("IP address: ");
+    debugger->println(WiFi.localIP());
+  }
 }
 
-void loop() {
-  loopMqtt();
+////////////////////////////////
+// OTA       ///////////////////
+////////////////////////////////
+void setupOTA() {
+  #ifdef USE_ARDUINO_OTA
+  // Port defaults to 8266
+  // ArduinoOTA.setPort(8266);
 
-  // Read one byt from the port, and see if we got a full package
-  if (hanReader.read())
-  {
-    // Get the list identifier
-    int listSize = hanReader.getListSize();
+  if (debugger) debugger->print("ArduinoOTA Initializing...");
+  
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname(OTA_HOSTNAME);
 
-    Serial1.println("");
-    Serial1.print("List size: ");
-    Serial1.print(listSize);
-    Serial1.print(": ");
+  // No authentication by default
+  ArduinoOTA.setPassword((const char *)OTA_PASSWORD);
 
-/*
-    // Only care for the ACtive Power Imported, which is found in the first list
-    if (listSize == (int)Kaifa::List1 || listSize == (int)Kaifa::List2 || listSize == (int)Kaifa::List3)
-    {
-      if (listSize == (int)Kaifa::List1)
-      {
-        Serial1.println(" (list #1 has no ID)");
-      }
-      else
-      {
-        String id = hanReader.getString((int)Kaifa_List2::ListVersionIdentifier);
-        Serial1.println(id);
-      }
-
-      // Get the timestamp (as unix time) from the package
-      time_t time = hanReader.getPackageTime();
-      Serial.print("Time of the package is: ");
-      Serial.println(time);
-  
-      // Define a json object to keep the data
-      StaticJsonBuffer<500> jsonBuffer;
-      JsonObject& root = jsonBuffer.createObject();
-      
-      // Any generic useful info here
-      root["id"] = "espdebugger";
-      root["up"] = millis();
-      root["t"] = time;
-  
-      // Add a sub-structure to the json object, 
-      // to keep the data from the meter itself
-      JsonObject& data = root.createNestedObject("data");
-      
-      // Based on the list number, get all details 
-      // according to OBIS specifications for the meter
-      if (listSize == (int)Kaifa::List1)
-      {
-        data["P"] = hanReader.getInt((int)Kaifa_List1::ActivePowerImported);
-      }
-      else if (listSize == (int)Kaifa::List2)
-      {
-        data["lv"] = hanReader.getString((int)Kaifa_List2::ListVersionIdentifier);
-        data["id"] = hanReader.getString((int)Kaifa_List2::MeterID);
-        data["type"] = hanReader.getString((int)Kaifa_List2::MeterType);
-        data["P"] = hanReader.getInt((int)Kaifa_List2::ActiveImportPower);
-        data["Q"] = hanReader.getInt((int)Kaifa_List2::ReactiveImportPower);
-        data["I1"] = hanReader.getInt((int)Kaifa_List2::CurrentL1);
-        data["I2"] = hanReader.getInt((int)Kaifa_List2::CurrentL2);
-        data["I3"] = hanReader.getInt((int)Kaifa_List2::CurrentL3);
-        data["U1"] = hanReader.getInt((int)Kaifa_List2::VoltageL1);
-        data["U2"] = hanReader.getInt((int)Kaifa_List2::VoltageL2);
-        data["U3"] = hanReader.getInt((int)Kaifa_List2::VoltageL3);
-      }
-      else if (listSize == (int)Kaifa::List3)
-      {
-        data["lv"] = hanReader.getString((int)Kaifa_List3::ListVersionIdentifier);;
-        data["id"] = hanReader.getString((int)Kaifa_List3::MeterID);
-        data["type"] = hanReader.getString((int)Kaifa_List3::MeterType);
-        data["P"] = hanReader.getInt((int)Kaifa_List3::ActiveImportPower);
-        data["Q"] = hanReader.getInt((int)Kaifa_List3::ReactiveImportPower);
-        data["I1"] = hanReader.getInt((int)Kaifa_List3::CurrentL1);
-        data["I2"] = hanReader.getInt((int)Kaifa_List3::CurrentL2);
-        data["I3"] = hanReader.getInt((int)Kaifa_List3::CurrentL3);
-        data["U1"] = hanReader.getInt((int)Kaifa_List3::VoltageL1);
-        data["U2"] = hanReader.getInt((int)Kaifa_List3::VoltageL2);
-        data["U3"] = hanReader.getInt((int)Kaifa_List3::VoltageL3);
-        data["tPI"] = hanReader.getInt((int)Kaifa_List3::CumulativeActiveImportEnergy);
-        data["tPO"] = hanReader.getInt((int)Kaifa_List3::CumulativeActiveExportEnergy);
-        data["tQI"] = hanReader.getInt((int)Kaifa_List3::CumulativeReactiveImportEnergy);
-        data["tQO"] = hanReader.getInt((int)Kaifa_List3::CumulativeReactiveExportEnergy);
-      }
-  
-      // Write the json to the debug port
-      root.printTo(Serial1);
-      Serial1.println();
-  
-      // Publish the json to the MQTT server
-      char msg[1024];
-      root.printTo(msg, 1024);
-      client.publish("sensors/out/espdebugger", msg);
+  ArduinoOTA.onStart([]() {
+    if (debugger) debugger->println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    if (debugger) debugger->println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    if (debugger) {
+      debugger->print("Progress: ");
+      debugger->print((progress / (total / 100)));
+      debugger->println("%%");
     }
-    */
-  }
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    if (debugger) {
+      debugger->print("Error[");
+      debugger->print(error);
+      debugger->print("]: ");
+    }
+    
+    if (error == OTA_AUTH_ERROR) {
+      if (debugger) { debugger->println("Auth Failed");}
+    }
+    else if (error == OTA_BEGIN_ERROR) {
+      if (debugger) { debugger->println("Begin Failed");}
+    }
+    else if (error == OTA_CONNECT_ERROR) {
+      if (debugger) { debugger->println("Connect Failed");}
+    }
+    else if (error == OTA_RECEIVE_ERROR) {
+      if (debugger) { debugger->println("Receive Failed");}
+    }
+    else if (error == OTA_END_ERROR) {
+      if (debugger) { debugger->println("End Failed");}
+    }
+  });
+  ArduinoOTA.begin();
+
+  if (debugger) debugger->println("Done");
+  #endif
+}
+
+void loopOTA() {
+  #ifdef USE_ARDUINO_OTA
+  ArduinoOTA.handle();
+  #endif
+}
+
+////////////////////////////////
+// NTP       ///////////////////
+////////////////////////////////
+void setupNTPClient() {
+  if (debugger) debugger->print("NTPClient Initializing...");
+  timeClient.begin();
+  if (debugger) debugger->println("Done");
+}
+
+void loopNTPClient() {
+  timeClient.update();
+}
+
+////////////////////////////////
+// MQTT      ///////////////////
+////////////////////////////////
+void setupMqtt() {
+  if (debugger) debugger->print("MQTT Initializing...");
+  mqttClient.setServer(MQTT_SERVER, MQTT_SERVERPORT);
+  mqttClient.setCallback(onMqttMessage);
+  espClient.setFingerprint(CONFIG_MQTT_FINGERPRINT);
+  if (debugger) debugger->println("Done");
 }
 
 // Ensure the MQTT lirary gets some attention too
 void loopMqtt()
 {
-  if (!client.connected()) {
+  if (!mqttClient.connected()) {
     reconnectMqtt();
   }
-  client.loop();
+  mqttClient.loop();
 }
+
+char buf[64];
 
 void reconnectMqtt() {
   // Loop until we're reconnected
-  while (!client.connected()) {
-    Serial1.print("Attempting MQTT connection...");
+  while (!mqttClient.connected()) {
+    if (debugger) debugger->print("MQTT connection establishing...");
     // Attempt to connect
-    if (client.connect("ESP8266Client")) {
-      Serial1.println("connected");
-      // Once connected, publish an announcement...
-      // client.publish("sensors", "hello world");
-      // ... and resubscribe
-      // client.subscribe("inTopic");
+    if (mqttClient.connect(MQTT_MYNAME)) {
+      if (debugger) debugger->println("Connected");
+      mqttClient.subscribe(power_topic_command);
+      mqttClient.publish(power_topic_debug, "Hello world");
+      
+      uint32_t freeHeap = system_get_free_heap_size();
+      
+      sprintf(buf, "Free heap: %u", freeHeap);
+      if (debugger) debugger->println(buf); 
+      mqttClient.publish(power_topic_debug, buf);
     }
     else {
-      Serial1.print("failed, rc=");
-      Serial1.print(client.state());
-      Serial1.println(" try again in 5 seconds");
+      if (debugger) debugger->print("Failed, rc=");
+      if (debugger) debugger->print(mqttClient.state());
+      if (debugger) debugger->println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
     }
+  }
+}
+
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  if (debugger) debugger->print("Message arrived [");
+  if (debugger) debugger->print(topic);
+  if (debugger) debugger->print("] ");
+  for (uint32_t i = 0; i < length; i++) {
+    char receivedChar = (char)payload[i];
+    debugger->print(receivedChar);
+    if (receivedChar == '0') {
+    }
+    if (receivedChar == '1') {
+    }
+  }
+  if (debugger) debugger->println();
+}
+
+////////////////////////////////
+// HAN       ///////////////////
+////////////////////////////////
+
+void setupHAN() {
+  hanPort = &Serial;
+
+  if (debugger) debugger->print("HAN MBUS Serial Setup Initializing...");
+  
+  //if (debugger) {
+  //  // Setup serial port for debugging
+  //  debugger->begin(2400, SERIAL_8E1);
+  //  while (!&debugger);
+  //  debugger->println("Started...");
+  //  debugger->setDebugOutput(true);
+  //}
+
+  if (hanPort) {
+    // Setup serial port for debugging
+    hanPort->begin(2400, SERIAL_8E1);
+    Serial.swap();
+    //hanPort->begin(115200, SERIAL_8E1);
+    while (!&hanPort);
+    //debugger->println("Started...");
+    //debugger->setDebugOutput(true);
+  }
+
+  hanReader.setNetworkLogger(mqttLogger);
+  // initialize the HanReader
+  // (passing Serial as the HAN port and Serial1 for debugging)
+  //hanReader.setup(&Serial, &Serial1);
+  hanReader.setup(&Serial, 115200, SERIAL_8E1, debugger);
+  if (debugger) debugger->println("Done");
+}
+
+void loopHAN() {
+  // Read one byte from the port, and see if we got a full package
+  if (hanReader.read()) {
+    // Get the list identifier
+    int listSize = hanReader.getListSize();
+
+    if (debugger) debugger->println("Preparing to send message");
+    if (debugger) debugger->print("List Size: ");
+    if (debugger) debugger->println(listSize); 
+
+    // Any generic useful info here
+    //root["id"] = "espdebugger";
+    //root["up"] = millis();
+    //root["t"] = time;
+    
+    unsigned long epoch = timeClient.getEpochTime();
+    String epochString = String(epoch);
+    
+    // Add a sub-structure to the json object, 
+    // to keep the data from the meter itself
+    //JsonArray& data = root.createNestedArray("data");
+    //char msg[512];
+    
+    for (auto&& elem : hanReader.cosemObjectList) { // access by forwarding reference, the type of i is int&
+      //elem->debugString(buf);
+      //printf("%s\n", buf);
+      //JsonObject& jsonElem = data.createNestedObject();
+      // Define a json object to keep the data
+      //StaticJsonBuffer<512> jsonBuffer;
+      //JsonObject& root = jsonBuffer.createObject();
+      //elem->toArduinoJson(root);
+
+
+      //root["t"] = epoch;
+      
+      String subTopicRoot = power_topic;
+      subTopicRoot += "/" + elem->ObisCodeString();
+
+      String subTopicValue = subTopicRoot + "/value";
+      String subTopicUnit = subTopicRoot + "/unit";
+      String subTopicUpdated = subTopicRoot + "/updated";
+
+      mqttClient.publish(subTopicValue.c_str(), elem->ValueString().c_str());
+      mqttClient.publish(subTopicUpdated.c_str(), epochString.c_str());
+
+      if (obisCodesSeen[elem->ObisCodeString()] == false) {
+        obisCodesSeen[elem->ObisCodeString()] = true;
+        mqttClient.publish(subTopicUnit.c_str(), elem->EnumString().c_str(), true);
+      }
+
+      elem->Reset();
+      delete elem;
+      
+      //root.printTo(msg, 512);
+      //debugger->println(msg);
+      //mqttClient.publish(subTopic.c_str(), msg);
+    }
+    hanReader.cosemObjectList.clear();
+
+    String subTopicListUpdated = String(power_topic) + "/list_updated";
+    mqttClient.publish(subTopicListUpdated.c_str(), epochString.c_str());
+    
+    // Write the json to the debug port
+    //root.printTo(Serial1);
+    //debugger->println("");
+
+    // Publish the json to the MQTT server
   }
 }
