@@ -49,6 +49,7 @@ class DlmsReader
     unsigned short GetChecksum(int checksumPosition);
     bool IsValidFrameFormat(byte frameFormatType);
     void WriteBuffer();
+	void debugPrint(byte *buffer, int start, int length);
 };
 
 #endif

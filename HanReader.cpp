@@ -6,7 +6,7 @@
 #include <math.h>
 #else
 extern "C" {
-#include "user_interface.h"
+//#include "user_interface.h"
 }
 #endif
 
@@ -389,7 +389,7 @@ bool HanReader::decodeListElement(uint16_t& nextPos, ObisElement* obisElement)
 
 bool HanReader::read(byte data)
 {
-	if (reader.Read(data))
+	if (reader.ReadOld(data))
 	{
 		if (debug) debug->println("Got message");
     if (debug) { debug->print("Free heap left: ");debug->println(system_get_free_heap_size()); }
