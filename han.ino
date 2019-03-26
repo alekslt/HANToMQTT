@@ -53,7 +53,7 @@ extern "C" {
 // for you. ////////////////////
 ////////////////////////////////
 #define USE_ARDUINO_OTA
-#define OTA_HOSTNAME "esp-powermeter-test1"
+#define OTA_HOSTNAME "esp-powermeter-test2"
 #define OTA_PASSWORD CONFIG_OTA_PASSWORD
 
 // WiFi
@@ -67,14 +67,15 @@ const char* password = CONFIG_WIFI_PASSWORD;
 #define MQTT_KEY         ""
 #define MQTT_MYNAME      OTA_HOSTNAME" Client"
 
-#define power_topic         "kdg/sensors/powermeterhan/obis"
-#define power_topic_command "kdg/sensors/powermeterhan/commands"
-#define power_topic_debug   "kdg/sensors/powermeterhan/debug"
+#define power_topic_base    "kdg/sensors/powermeterhan"
+#define power_topic         power_topic_base"/obis"
+#define power_topic_command power_topic_base"/commands"
+#define power_topic_debug   power_topic_base"/debug"
 
 // NTP
 #define NTP_SERVER      CONFIG_NTP_SERVER
 
-#define REPORTING_DEBUG_PERIOD 1000
+#define REPORTING_DEBUG_PERIOD 10000
 
 ////////////////////////////////
 // Forward declerations ////////
@@ -170,8 +171,8 @@ void setupDebugPort() {
   //Serial1.begin(115200);
   //while (!Serial1) {}
   //Serial1.setDebugOutput(true);
-  Serial1.println("Serial1");
-  Serial1.println("Serial1 debugging port initialized");
+  //Serial1.println("Serial1");
+  //Serial1.println("Serial1 debugging port initialized");
 }
 
 void setupWiFi() {
@@ -365,7 +366,7 @@ void setupHAN() {
   // initialize the HanReader
   // (passing Serial as the HAN port and Serial1 for debugging)
   //hanReader.setup(&Serial, &Serial1);
-  hanReader.setup(&Serial, 115200, SERIAL_8E1, debugger);
+  hanReader.setup(hanPort, 115200, SERIAL_8E1, debugger);
   if (debugger) debugger->println("Done");
 }
 

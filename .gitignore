@@ -345,3 +345,5 @@ healthchecksdb
 MigrationBackup/
 ArduinoJson-5.13.4/
 ArduinoJson-*/
+testprogs/
+oldprog/
