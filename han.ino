@@ -28,13 +28,15 @@
 //#include <set>
 
 extern "C" {
-#include "user_interface.h"
+//#include "user_interface.h"
 }
 
 #include <ESP8266WiFi.h> // Wifi
+//#include <WiFi.h> // Wifi
 #include <EEPROM.h> // ??
 #include <ArduinoOTA.h> // For OTA Programming
 #include <NTPClient.h> // For NTP Wall Clock Time Syncronization
+#include <WiFiClientSecure.h>
 #include <WiFiUdp.h> // For NTP Wall Clock Time Syncronization
 
 //#include <ArduinoJson.h> // json
@@ -77,6 +79,9 @@ const char* password = CONFIG_WIFI_PASSWORD;
 
 #define REPORTING_DEBUG_PERIOD 10000
 
+#define RXD2 16
+#define TXD2 17
+
 ////////////////////////////////
 // Forward declerations ////////
 ////////////////////////////////
@@ -91,7 +96,7 @@ HardwareSerial* debugger = NULL;
 //DlmsReader reader;
 HanReader hanReader;
 //HanReaderTest hanTest;
-
+HardwareSerial HSerial1(1);
 HardwareSerial* hanPort;
 
 // Wifi and MQTT
@@ -139,9 +144,9 @@ void loop() {
   now = millis();
   if ((unsigned long)(now - lastUpdate) >= REPORTING_DEBUG_PERIOD) {   
     lastUpdate = now;
-    uint32_t freeHeap = system_get_free_heap_size();
-    char buf[64];
-    sprintf(buf, "Free heap: %u", freeHeap); 
+    //uint32_t freeHeap = system_get_free_heap_size();
+    //char buf[64];
+    //sprintf(buf, "Free heap: %u", freeHeap); 
     //mqttClient.publish(power_topic_debug, buf);
   }
   delay(10);
@@ -161,10 +166,10 @@ void mqttLogger(const char *fmt, ...) {
 
 void setupDebugPort() {
   // Uncomment to debug over the same port as used for HAN communication
-  //debugger = &Serial;
+  debugger = &Serial;
   
   // initialize serial communication at 9600 bits per second:
-  //Serial.begin(115200); //115200 2400
+  Serial.begin(115200); //115200 2400
   //Serial.println("Serial debugging port initialized");
   // Initialize the Serial1 port for debugging
   // (This port is fixed to Pin2 of the ESP8266)
@@ -279,7 +284,7 @@ void setupMqtt() {
   if (debugger) debugger->print("MQTT Initializing...");
   mqttClient.setServer(MQTT_SERVER, MQTT_SERVERPORT);
   mqttClient.setCallback(onMqttMessage);
-  espClient.setFingerprint(CONFIG_MQTT_FINGERPRINT);
+  //espClient.setFingerprint(CONFIG_MQTT_FINGERPRINT);
   if (debugger) debugger->println("Done");
 }
 
@@ -292,7 +297,7 @@ void loopMqtt()
   mqttClient.loop();
 }
 
-char buf[64];
+//char buf[64];
 
 void reconnectMqtt() {
   // Loop until we're reconnected
@@ -304,11 +309,11 @@ void reconnectMqtt() {
       mqttClient.subscribe(power_topic_command);
       mqttClient.publish(power_topic_debug, "Hello world");
       
-      uint32_t freeHeap = system_get_free_heap_size();
+      //uint32_t freeHeap = system_get_free_heap_size();
       
-      sprintf(buf, "Free heap: %u", freeHeap);
-      if (debugger) debugger->println(buf); 
-      mqttClient.publish(power_topic_debug, buf);
+      //sprintf(buf, "Free heap: %u", freeHeap);
+      //if (debugger) debugger->println(buf); 
+      //mqttClient.publish(power_topic_debug, buf);
     }
     else {
       if (debugger) debugger->print("Failed, rc=");
@@ -340,7 +345,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 ////////////////////////////////
 
 void setupHAN() {
-  hanPort = &Serial;
+  hanPort = &HSerial1;
 
   if (debugger) debugger->print("HAN MBUS Serial Setup Initializing...");
   
@@ -355,9 +360,10 @@ void setupHAN() {
   if (hanPort) {
     // Setup serial port for debugging
     hanPort->begin(2400, SERIAL_8E1);
-    Serial.swap();
+    //hanPort->begin(2400,SERIAL_8E1, RXD2, TXD2);
+    //Serial.swap();
     //hanPort->begin(115200, SERIAL_8E1);
-    while (!&hanPort);
+    //while (!&hanPort);
     //debugger->println("Started...");
     //debugger->setDebugOutput(true);
   }
