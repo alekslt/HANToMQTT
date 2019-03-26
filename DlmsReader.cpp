@@ -17,6 +17,10 @@ void DlmsReader::Clear()
 
 bool DlmsReader::ReadOld(byte data)
 {
+//    if (debug && debugLevel > 1) debug->print(position, HEX);
+//    if (debug && debugLevel > 1) debug->print("\t");
+//    if (debug && debugLevel > 1) debug->println(data, HEX);
+            
     if (position == 0 && data != 0x7E)
     {
         // we haven't started yet, wait for the start flag (no need to capture any data yet)
@@ -109,7 +113,7 @@ bool DlmsReader::ReadOld(byte data)
             printf(" CheckSum: %x, CalcCheck: %x, Pos:%x, dataLength:%x \n", checksum, calculatedChecksum, position, dataLength);
             if (checksum != calculatedChecksum) {
                 if (netLog && debugLevel > 1) netLog("Mismatched frame checksum. Reset. Pos: %x. CheckP:%x, CheckC:%x, DL: %x", position, checksum, calculatedChecksum, dataLength);
-                if (netLog && debugLevel > 1) {
+                if (false && netLog && debugLevel > 1) {
                     char debuf[128];
                     int kChunkSize = 45;
                     int chunks = position / kChunkSize;
@@ -242,7 +246,7 @@ bool DlmsReader::Read(byte data)
             	return false;
             }
 
-			uint8_t control = buffer[2 + destinationAddressLength + sourceAddressLength];
+            // uint8_t control = buffer[2 + destinationAddressLength + sourceAddressLength];
 
             // Capture the length of the data package
             dataLength = ((buffer[0] & 0x0F) << 8) | buffer[1];
@@ -281,7 +285,7 @@ bool DlmsReader::Read(byte data)
 			if (frameChecksum != calculatedframeChecksum) {
 				if (debug && debugLevel > 1) debug->println("Mismatched frame checksum. Reset");
 				if (netLog && debugLevel > 1) netLog("Mismatched frame checksum. Reset");
-
+/*
                 if (netLog && debugLevel > 1 && position < 64) {
                     char debuf[128];
                     for (int i = 0; i < position; i++)
@@ -291,7 +295,7 @@ bool DlmsReader::Read(byte data)
                     debuf[position * 2] = 0x00;
                     netLog("%s", debuf);
                 }
-        
+*/
 				Clear();
                 this->state = kHDLCState_Waiting;
 				return false;
@@ -352,7 +356,7 @@ bool DlmsReader::GetUserDataBuffer(byte *&dataBuffer, int& length)
 	if (dataLength > 0 && position - 2 == dataLength)
 	{
 		int headerLength = 4 + destinationAddressLength + sourceAddressLength + 2;
-		int bytesWritten = 0;
+		// int bytesWritten = 0;
 		dataBuffer = &(buffer[0+ headerLength]);
 		length = dataLength- headerLength -2;
 
@@ -391,7 +395,7 @@ bool DlmsReader::GetUserDataBuffer(byte *&dataBuffer, int& length)
     }
 }
 */
-
+/*
 int DlmsReader::GetRawData(byte *dataBuffer, int start, int length)
 {
     if (dataLength > 0 && position == dataLength + 2)
@@ -408,7 +412,7 @@ int DlmsReader::GetRawData(byte *dataBuffer, int start, int length)
     else
         return 0;
 }
-
+*/
 int DlmsReader::GetAddress(int addressPosition, byte* addressBuffer, int start, int length)
 {
     int addressBufferPos = start;

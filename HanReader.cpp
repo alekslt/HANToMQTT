@@ -83,7 +83,7 @@ String ObisElement::ObisCodeString() {
 
     return String(buf);
 }
-
+/*
 void ObisElement::toArduinoJson(JsonObject& json) {
 	char buf[64];
 	sprintf(buf, "%d.%d.%d.%d.%d.%d",
@@ -115,7 +115,7 @@ void ObisElement::toArduinoJson(JsonObject& json) {
 		break;
 	}
 }
-
+*/
 void ObisElement::Reset() {
 	if (this->data->dataType == TYPE_DATETIME &&
 		this->data->value.value_dateTime != NULL) {
@@ -211,11 +211,11 @@ bool HanReader::decodeClockAndDeviation(byte* buf, ClockDeviation& element) {
 
 	uint8_t month = buf[2];
 	uint8_t day = buf[3];
-	uint8_t dayOfWeek = buf[4];
+	//uint8_t dayOfWeek = buf[4];
 	uint8_t hour = buf[5];
 	uint8_t minute = buf[6];
 	uint8_t second = buf[7];
-	uint8_t hundreths = buf[8]; // Can be 0xFF if not used
+	//uint8_t hundreths = buf[8]; // Can be 0xFF if not used
 
 	sprintf(element.dateTime, "%04u.%02u.%02uT%02u:%02u:%02u", year, month, day, hour, minute, second);
 	element.deviation = buf[9] << 8 | buf[10];
@@ -392,7 +392,7 @@ bool HanReader::read(byte data)
 	if (reader.ReadOld(data))
 	{
 		if (debug) debug->println("Got message");
-    if (debug) { debug->print("Free heap left: ");debug->println(system_get_free_heap_size()); }
+    //if (debug) { debug->print("Free heap left: ");debug->println(system_get_free_heap_size()); }
 		//bytesRead = reader.GetRawData(buffer, 0, 512);
 
 		bool retUserBufferSuccess = reader.GetUserDataBuffer(userData, userDataLen);

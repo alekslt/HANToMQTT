@@ -27,7 +27,7 @@ class DlmsReader
     bool Read(byte data);
     bool ReadOld(byte data);
 	  bool GetUserDataBuffer(byte *&dataBuffer, int& length);
-    int GetRawData(byte *buffer, int start, int length);
+    //int GetRawData(byte *buffer, int start, int length);
     
   protected:
     Crc16Class Crc16;

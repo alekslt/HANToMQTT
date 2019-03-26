@@ -37,10 +37,10 @@ extern "C" {
 #include <NTPClient.h> // For NTP Wall Clock Time Syncronization
 #include <WiFiUdp.h> // For NTP Wall Clock Time Syncronization
 
-#include <ArduinoJson.h> // json
+//#include <ArduinoJson.h> // json
 
-#define MQTT_MAX_PACKET_SIZE 512
-#include "PubSubClient.h" // MQTT
+//#define MQTT_MAX_PACKET_SIZE 512
+#include <PubSubClient.h> // MQTT
 
 #include "HanReader.h"
 
@@ -148,11 +148,11 @@ void loop() {
 
 
 
-char mqttLogBuf[256];
+char mqttLogBuf[100];
 void mqttLogger(const char *fmt, ...) {
   va_list argptr;
   va_start(argptr, fmt);
-  vsnprintf(mqttLogBuf, 256, fmt, argptr);
+  vsnprintf(mqttLogBuf, 100, fmt, argptr);
   va_end(argptr);
   mqttClient.publish(power_topic_debug, mqttLogBuf);
 }

@@ -3,12 +3,13 @@
 
 #if defined(ARDUINO) && ARDUINO >= 100
   #include "arduino.h"
+  #include <HardwareSerial.h>
 #else
   #include "WProgram.h"
 #endif
 
 #include <vector>
-#include <ArduinoJson.h>
+//#include <ArduinoJson.h>
 #include "DlmsReader.h"
 
 const byte TYPE_LIST = 0x01;
@@ -55,10 +56,12 @@ struct ObisElement {
   String EnumString();
   
 	void debugString(char* buf);
-	void toArduinoJson(JsonObject& json);
+	//void toArduinoJson(JsonObject& json);
 	
 	void Reset();
 };
+
+//typedef uint32_t SerialConfig;
 
 class HanReader
 {
@@ -97,6 +100,7 @@ private:
 	void debugPrint(byte *buffer, int start, int length);
 };
 
+/*
 class HanReaderTest
 {
 public:
@@ -116,5 +120,5 @@ private:
   byte* userData;
   int userDataLen;
 };
-
+*/
 #endif
