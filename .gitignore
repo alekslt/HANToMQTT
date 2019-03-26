@@ -347,3 +347,4 @@ ArduinoJson-5.13.4/
 ArduinoJson-*/
 testprogs/
 oldprog/
+secret.h

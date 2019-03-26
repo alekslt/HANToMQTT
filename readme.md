@@ -7,6 +7,9 @@ I also get the current time from a NTP-server so all list updates have the time 
 
 On the subscription end of MQTT you can use list_updated as a syncronization point and update the topics that have a matching timestamp.
 
+I'm currently hard coding the secrets (ssid/psk/server adresses/...) in a file secret.h,
+I've included an example of this file.
+
 
 # !!! Known Issues !!!
 
