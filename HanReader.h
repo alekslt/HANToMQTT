@@ -29,36 +29,36 @@ const byte kObisCodeSize = 0x06;
 const byte kObisClockAndDeviation[] = { 0x00, 0x00, 0x01, 0x00, 0x00, 0xff };
 
 struct ClockDeviation {
-	char dateTime[20];
-	uint16_t deviation;
-	byte clockStatus;
+  char dateTime[20];
+  uint16_t deviation;
+  byte clockStatus;
 };
 
 struct Element {
-	byte dataType;
-	byte stringLength;
-	union Value {
-		char* value_string;
-		uint32_t value_uint;
-		int32_t value_int;
-		float value_float;
-		ClockDeviation* value_dateTime;
-	} value;
+  byte dataType;
+  byte stringLength;
+  union Value {
+    char* value_string;
+    uint32_t value_uint;
+    int32_t value_int;
+    float value_float;
+    ClockDeviation* value_dateTime;
+  } value;
 };
 
 struct ObisElement {
-	byte* obisOctets;
-	Element* data;
-	uint8_t enumType;
+  byte* obisOctets;
+  Element* data;
+  uint8_t enumType;
 
   String ObisCodeString();
   String ValueString();
   String EnumString();
-  
-	void debugString(char* buf);
-	//void toArduinoJson(JsonObject& json);
-	
-	void Reset();
+
+  void debugString(char* buf);
+  //void toArduinoJson(JsonObject& json);
+
+  void Reset();
 };
 
 //typedef uint32_t SerialConfig;
@@ -66,38 +66,38 @@ struct ObisElement {
 class HanReader
 {
 public:
-	//const uint8_t dataHeader = 8;
- 	std::vector<ObisElement*> cosemObjectList;
+  //const uint8_t dataHeader = 8;
+  std::vector<ObisElement*> cosemObjectList;
 
-	HanReader();
-	void setup(HardwareSerial *hanPort);
-	void setup(HardwareSerial *hanPort, Stream *debugPort);
-	void setup(HardwareSerial *hanPort, unsigned long baudrate, SerialConfig config, Stream *debugPort);
+  HanReader();
+  void setup(HardwareSerial *hanPort);
+  void setup(HardwareSerial *hanPort, Stream *debugPort);
+  void setup(HardwareSerial *hanPort, unsigned long baudrate, SerialConfig config, Stream *debugPort);
   void setNetworkLogger(LOG_FN function) { netLog = function; }
-	bool read();
-	bool read(byte data);
-	int getListSize();
+  bool read();
+  bool read(byte data);
+  int getListSize();
 
 private:
-	uint8_t debugLevel;
-	Stream *debug;
+  uint8_t debugLevel;
+  Stream *debug;
   LOG_FN netLog;
-	HardwareSerial *han;
-	//byte buffer[512];
-	int bytesRead;
-	DlmsReader reader;
-	int listSize;
-	byte* userData;
-	int userDataLen;
+  HardwareSerial *han;
+  //byte buffer[512];
+  int bytesRead;
+  DlmsReader reader;
+  int listSize;
+  byte* userData;
+  int userDataLen;
 
   void Init();
-	void printObjectStart(uint16_t pos);
-	bool decodeClockAndDeviation(byte* buf, ClockDeviation& element);
-	bool decodeAndApplyScalerElement(uint16_t& nextPos, ObisElement* element);
-	bool decodeDataElement(uint16_t& nextPos, Element& element);
-	bool decodeListElement(uint16_t& nextPos, ObisElement* obisElement);
+  void printObjectStart(uint16_t pos);
+  bool decodeClockAndDeviation(byte* buf, ClockDeviation& element);
+  bool decodeAndApplyScalerElement(uint16_t& nextPos, ObisElement* element);
+  bool decodeDataElement(uint16_t& nextPos, Element& element);
+  bool decodeListElement(uint16_t& nextPos, ObisElement* obisElement);
 
-	void debugPrint(byte *buffer, int start, int length);
+  void debugPrint(byte *buffer, int start, int length);
 };
 
 /*

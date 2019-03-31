@@ -1,20 +1,20 @@
 /*
  * PowerMeter HAN-port to MQTT program
  * WRT, Roar Fredriksen.
- * We are required to use the hardware serial 
+ * We are required to use the hardware serial
  * on the esp8266 as we need the even-parity support.
  * Serial1 can be used for low level debugging,
  * but I will also use a debug-mqtt topic.
- * 
+ *
  * (Re)Programming should be done using OTA.
- * 
+ *
  * Notes
  * 1. PubSubClient is included in the project due as I require to enlarge the buffer used and
  *    the Arduino IDE does not allow for an easy way to do this currently by setting a define here.
  *    The headers are compiled before this unit.
  * 2. Regarding the above. Currently we have enough RAM to not care about using both a string buffer to
  *    format the message and another for mqtt to send.
- *    
+ *
  * Aleksander Lygren Toppe
  * 2019.02.17
  * GPL? Public Domain? MIT?
@@ -142,11 +142,11 @@ void loop() {
   loopHAN();
 
   now = millis();
-  if ((unsigned long)(now - lastUpdate) >= REPORTING_DEBUG_PERIOD) {   
+  if ((unsigned long)(now - lastUpdate) >= REPORTING_DEBUG_PERIOD) {
     lastUpdate = now;
     //uint32_t freeHeap = system_get_free_heap_size();
     //char buf[64];
-    //sprintf(buf, "Free heap: %u", freeHeap); 
+    //sprintf(buf, "Free heap: %u", freeHeap);
     //mqttClient.publish(power_topic_debug, buf);
   }
   delay(10);
@@ -167,7 +167,7 @@ void mqttLogger(const char *fmt, ...) {
 void setupDebugPort() {
   // Uncomment to debug over the same port as used for HAN communication
   debugger = &Serial;
-  
+
   // initialize serial communication at 9600 bits per second:
   Serial.begin(115200); //115200 2400
   //Serial.println("Serial debugging port initialized");
@@ -209,7 +209,7 @@ void setupOTA() {
   // ArduinoOTA.setPort(8266);
 
   if (debugger) debugger->print("ArduinoOTA Initializing...");
-  
+
   // Hostname defaults to esp8266-[ChipID]
   ArduinoOTA.setHostname(OTA_HOSTNAME);
 
@@ -235,7 +235,7 @@ void setupOTA() {
       debugger->print(error);
       debugger->print("]: ");
     }
-    
+
     if (error == OTA_AUTH_ERROR) {
       if (debugger) { debugger->println("Auth Failed");}
     }
@@ -308,11 +308,11 @@ void reconnectMqtt() {
       if (debugger) debugger->println("Connected");
       mqttClient.subscribe(power_topic_command);
       mqttClient.publish(power_topic_debug, "Hello world");
-      
+
       //uint32_t freeHeap = system_get_free_heap_size();
-      
+
       //sprintf(buf, "Free heap: %u", freeHeap);
-      //if (debugger) debugger->println(buf); 
+      //if (debugger) debugger->println(buf);
       //mqttClient.publish(power_topic_debug, buf);
     }
     else {
@@ -348,7 +348,7 @@ void setupHAN() {
   hanPort = &HSerial1;
 
   if (debugger) debugger->print("HAN MBUS Serial Setup Initializing...");
-  
+
   //if (debugger) {
   //  // Setup serial port for debugging
   //  debugger->begin(2400, SERIAL_8E1);
@@ -384,21 +384,21 @@ void loopHAN() {
 
     if (debugger) debugger->println("Preparing to send message");
     if (debugger) debugger->print("List Size: ");
-    if (debugger) debugger->println(listSize); 
+    if (debugger) debugger->println(listSize);
 
     // Any generic useful info here
     //root["id"] = "espdebugger";
     //root["up"] = millis();
     //root["t"] = time;
-    
+
     unsigned long epoch = timeClient.getEpochTime();
     String epochString = String(epoch);
-    
-    // Add a sub-structure to the json object, 
+
+    // Add a sub-structure to the json object,
     // to keep the data from the meter itself
     //JsonArray& data = root.createNestedArray("data");
     //char msg[512];
-    
+
     for (auto&& elem : hanReader.cosemObjectList) { // access by forwarding reference, the type of i is int&
       //elem->debugString(buf);
       //printf("%s\n", buf);
@@ -410,7 +410,7 @@ void loopHAN() {
 
 
       //root["t"] = epoch;
-      
+
       String subTopicRoot = power_topic;
       subTopicRoot += "/" + elem->ObisCodeString();
 
@@ -428,7 +428,7 @@ void loopHAN() {
 
       elem->Reset();
       delete elem;
-      
+
       //root.printTo(msg, 512);
       //debugger->println(msg);
       //mqttClient.publish(subTopic.c_str(), msg);
@@ -437,7 +437,7 @@ void loopHAN() {
 
     String subTopicListUpdated = String(power_topic) + "/list_updated";
     mqttClient.publish(subTopicListUpdated.c_str(), epochString.c_str());
-    
+
     // Write the json to the debug port
     //root.printTo(Serial1);
     //debugger->println("");

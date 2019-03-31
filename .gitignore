@@ -348,3 +348,4 @@ ArduinoJson-*/
 testprogs/
 oldprog/
 secret.h
+data/

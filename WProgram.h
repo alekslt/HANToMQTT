@@ -33,7 +33,7 @@ class SerialConfig;
 class SerialConfig
 {
 public:
-	bool parameter = 1;
+  bool parameter = 1;
 
 };
 
@@ -41,64 +41,64 @@ class Stream
 {
 public:
 
-	void print(int str, int type) {
-		if (type == HEX) {
-			printf("%x", str);
-		} else {
-			printf("%d", str);
-		}
-	}
+  void print(int str, int type) {
+    if (type == HEX) {
+      printf("%x", str);
+    } else {
+      printf("%d", str);
+    }
+  }
 
-	void print(byte str) { 
-		print ((int)str, 0);
-	}
+  void print(byte str) {
+    print ((int)str, 0);
+  }
 
-	void print(int str) {
-		printf("%d", str);
-	}
+  void print(int str) {
+    printf("%d", str);
+  }
 
-	void print(char* str) {
-		printf("%s", str);
-	}
+  void print(char* str) {
+    printf("%s", str);
+  }
 
-	void println(int str, int type) {
-		print(str, type);
-		printf("\n");
-	}
+  void println(int str, int type) {
+    print(str, type);
+    printf("\n");
+  }
 
-	void println(int str) {
-		print(str);
-		printf("\n");
-	}
+  void println(int str) {
+    print(str);
+    printf("\n");
+  }
 
-	void println(char* str) {
-		printf("%s", str);
-		printf("\n");
-	}
+  void println(char* str) {
+    printf("%s", str);
+    printf("\n");
+  }
 
-	void print(uint32_t value) {
-		printf("%u", value);
-	}
+  void print(uint32_t value) {
+    printf("%u", value);
+  }
 
-	void print(float value) {
-		printf("%f", value);
-	}
+  void print(float value) {
+    printf("%f", value);
+  }
 
-	void print(const char* str) {
-		printf("%s", str);
-	}
+  void print(const char* str) {
+    printf("%s", str);
+  }
 
-	void println(const char* str) {
-		printf("%s", str);
-		printf("\n");
-	}
+  void println(const char* str) {
+    printf("%s", str);
+    printf("\n");
+  }
 
 };
 
 // Crc: 28197
 
 static byte shortmessage[] = { 0x7e, 0xa0,0x2a,0x41,0x08,0x83,0x13,0x04,0x13,0xe6,0xe7,0x00,0x0f,0x40,0x00,0x00,0x00,0x00,0x01,0x01,0x02,
-						03,0x09,0x06,0x01,0x00,0x01,0x07,0x00,0xff,0x06,0x00,0x00,0x0f,0xb3,0x02,0x02,0x0f,0x00,0x16,0x1b,0x25,0x6e, 0x7e };
+            03,0x09,0x06,0x01,0x00,0x01,0x07,0x00,0xff,0x06,0x00,0x00,0x0f,0xb3,0x02,0x02,0x0f,0x00,0x16,0x1b,0x25,0x6e, 0x7e };
 
 // Invalid "00 48 07 00 ff 12 08 e2 fe 02 0f ff 16 23 06 f0"
 // Invalid "00 48 07 00 ff 12 08 e3 02 02 0f ff 16 23 88 1b"
@@ -114,66 +114,66 @@ static const char* test_list3 = "7e a1 77 41 08 83 13 39 1e e6 e7 00 0f 40 00 00
 class HardwareSerial : public Stream
 {
 public:
-	int fd;
-	uint32_t msgPos = 0;
-	uint32_t elements;
-	uint32_t msgLen = 44;
-	unsigned char message[512];
+  int fd;
+  uint32_t msgPos = 0;
+  uint32_t elements;
+  uint32_t msgLen = 44;
+  unsigned char message[512];
 
-	void begin(unsigned long baudrate, SerialConfig config) {
-		if (baudrate || config.parameter) {
+  void begin(unsigned long baudrate, SerialConfig config) {
+    if (baudrate || config.parameter) {
 
-		}
-	}
+    }
+  }
 
-	bool available() {
-		if (this->msgPos < this->elements) {
-			return true;
-		} else {
-			//this->msgPos = 0;
-			//sleep(1000);
-			return false;
-		}
+  bool available() {
+    if (this->msgPos < this->elements) {
+      return true;
+    } else {
+      //this->msgPos = 0;
+      //sleep(1000);
+      return false;
+    }
 
-		//return true;
-		int bytes;
-		ioctl(fd, FIONREAD, &bytes);
-		return bytes > 0;
-	}
+    //return true;
+    int bytes;
+    ioctl(fd, FIONREAD, &bytes);
+    return bytes > 0;
+  }
 
-	byte read() {
-		return this->message[this->msgPos++];
+  byte read() {
+    return this->message[this->msgPos++];
 
-		int n;
-		unsigned char buf[2];
-		int len = 1;
-		while (1) {
-			n = ::read(fd, buf, len);
+    int n;
+    unsigned char buf[2];
+    int len = 1;
+    while (1) {
+      n = ::read(fd, buf, len);
 
-			if (n>=0) {
-				break;
-			}
-			if (errno == EAGAIN) {
-				usleep(1000);
-			}
-		}
-		return buf[0];
-	}
+      if (n>=0) {
+        break;
+      }
+      if (errno == EAGAIN) {
+        usleep(1000);
+      }
+    }
+    return buf[0];
+  }
 
 
-	HardwareSerial(int read_fd) {
-		fd = read_fd;
+  HardwareSerial(int read_fd) {
+    fd = read_fd;
 
-		const char *pos = eror_list2;
-		/* WARNING: no sanitization or error-checking whatsoever */
-		uint32_t stringLength = strlen(eror_list2);
-		elements = (uint32_t)round((stringLength+1) / 3);
-		//elements += 2;
-		for (size_t count = 0; count < elements; count++) {
-			sscanf(pos, "%2hhx", &this->message[count]);
-			pos += 3;
-		}
-	}
+    const char *pos = eror_list2;
+    /* WARNING: no sanitization or error-checking whatsoever */
+    uint32_t stringLength = strlen(eror_list2);
+    elements = (uint32_t)round((stringLength+1) / 3);
+    //elements += 2;
+    for (size_t count = 0; count < elements; count++) {
+      sscanf(pos, "%2hhx", &this->message[count]);
+      pos += 3;
+    }
+  }
 };
 
 extern void yield();

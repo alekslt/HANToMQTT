@@ -22,16 +22,16 @@ class DlmsReader
     uint8_t debugLevel;
     Stream *debug;
     LOG_FN netLog;
-    
+
     DlmsReader();
     bool Read(byte data);
     bool ReadOld(byte data);
-	  bool GetUserDataBuffer(byte *&dataBuffer, int& length);
+    bool GetUserDataBuffer(byte *&dataBuffer, int& length);
     //int GetRawData(byte *buffer, int start, int length);
-    
+
   protected:
     Crc16Class Crc16;
-    
+
   private:
     byte buffer[DLMS_READER_BUFFER_SIZE];
     int position;
@@ -49,7 +49,7 @@ class DlmsReader
     unsigned short GetChecksum(int checksumPosition);
     bool IsValidFrameFormat(byte frameFormatType);
     void WriteBuffer();
-	void debugPrint(byte *buffer, int start, int length);
+    void debugPrint(byte *buffer, int start, int length);
 };
 
 #endif

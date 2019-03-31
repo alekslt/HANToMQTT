@@ -20,7 +20,7 @@ bool DlmsReader::ReadOld(byte data)
 //    if (debug && debugLevel > 1) debug->print(position, HEX);
 //    if (debug && debugLevel > 1) debug->print("\t");
 //    if (debug && debugLevel > 1) debug->println(data, HEX);
-            
+
     if (position == 0 && data != 0x7E)
     {
         // we haven't started yet, wait for the start flag (no need to capture any data yet)
@@ -31,7 +31,7 @@ bool DlmsReader::ReadOld(byte data)
         // We have completed reading of one package, so clear and be ready for the next
         if (dataLength > 0 && position >= dataLength + 2)
             Clear();
-        
+
         // Check if we're about to run into a buffer overflow
         if (position >= DLMS_READER_BUFFER_SIZE)
             Clear();
@@ -62,7 +62,7 @@ bool DlmsReader::ReadOld(byte data)
                 if (netLog && debugLevel > 1) netLog("FF: %x, V:%d", frameFormatType, IsValidFrameFormat(frameFormatType));
                 Clear();
             }
-            
+
             return false;
         }
         else if (position == 3)
@@ -93,14 +93,14 @@ bool DlmsReader::ReadOld(byte data)
             if (debug && debugLevel > 1) debugPrint(buffer, 0, position);
 
             // Verify the header checksum
-			uint16_t headerChecksum = GetChecksum(position - 2);
-			uint16_t calculatedChecksum = Crc16.ComputeChecksum(buffer, 1, position - 3);
+            uint16_t headerChecksum = GetChecksum(position - 2);
+            uint16_t calculatedChecksum = Crc16.ComputeChecksum(buffer, 1, position - 3);
             printf(" Header CheckSum: %x, Calculated : %x\n", headerChecksum, calculatedChecksum);
             if (headerChecksum != calculatedChecksum) {
                 if (netLog && debugLevel > 1) netLog("Mismatched header checksum. Reset");
                 Clear();
             }
-                
+
             return false;
         }
         else if (position == dataLength + 1)
@@ -108,7 +108,7 @@ bool DlmsReader::ReadOld(byte data)
             if (debug && debugLevel > 1) debugPrint(buffer, 0, position);
 
             // Verify the data package checksum
-			uint16_t checksum = this->GetChecksum(position - 2);
+            uint16_t checksum = this->GetChecksum(position - 2);
             uint16_t calculatedChecksum = Crc16.ComputeChecksum(buffer, 1, position-3);
             printf(" CheckSum: %x, CalcCheck: %x, Pos:%x, dataLength:%x \n", checksum, calculatedChecksum, position, dataLength);
             if (checksum != calculatedChecksum) {
@@ -127,11 +127,11 @@ bool DlmsReader::ReadOld(byte data)
                         }
                         debuf[toPos*2] = 0x00;
                         netLog("%s", debuf);
-                    }                 
+                    }
                 }
                 Clear();
             }
-            
+
             return false;
         }
         else if (position == dataLength + 2)
@@ -156,7 +156,7 @@ bool DlmsReader::Read(byte data)
 {
 /*
         # Waiting for packet start
-        if (self.state == WAITING): 
+        if (self.state == WAITING):
             if (c == FLAG):
                 self.state = DATA
                 self.pkt = ""
@@ -204,10 +204,10 @@ bool DlmsReader::Read(byte data)
             }
 
             if (debug && debugLevel >1 ) debugPrint(buffer, 0, position);
-            
+
             if (debug && debugLevel > 1) debug->print(" Frame Stop Flag. Pos: ");
             if (debug && debugLevel > 1) debug->println(position, HEX);
-            
+
             // Minimum length check
             if (position <= 18)
             {
@@ -222,28 +222,28 @@ bool DlmsReader::Read(byte data)
             if (debug && debugLevel > 1) debug->print(frameFormatType, HEX);
             if (debug && debugLevel > 1) debug->print(" Valid: ");
             if (debug && debugLevel > 1) debug->println(IsValidFrameFormat(frameFormatType));
-            
+
             if (!IsValidFrameFormat(frameFormatType))
             {
               if (netLog && debugLevel > 1) netLog("FF: %x, V:%d", frameFormatType, IsValidFrameFormat(frameFormatType));
-            	Clear();
-            	return false;
+              Clear();
+              return false;
             }
-            
+
             // Capture the destination address
             destinationAddressLength = GetAddress(2, destinationAddress, 0, DLMS_READER_MAX_ADDRESS_SIZE);
             if (destinationAddressLength > 3)
             {
-            	Clear();
-            	return false;
+              Clear();
+              return false;
             }
-                  
+
             // Capture the source address
             sourceAddressLength = GetAddress(2 + destinationAddressLength, sourceAddress, 0, DLMS_READER_MAX_ADDRESS_SIZE);
             if (sourceAddressLength > 3)
             {
-            	Clear();
-            	return false;
+              Clear();
+              return false;
             }
 
             // uint8_t control = buffer[2 + destinationAddressLength + sourceAddressLength];
@@ -254,37 +254,37 @@ bool DlmsReader::Read(byte data)
             if (debug && debugLevel > 1) debug->println(dataLength, HEX);
 
             // CRC Check
-			uint8_t headerLength = 2 + destinationAddressLength + sourceAddressLength + 1;
+            uint8_t headerLength = 2 + destinationAddressLength + sourceAddressLength + 1;
             uint16_t headerChecksum = GetChecksum(headerLength);
             uint16_t calculatedHeaderChecksum = Crc16.ComputeChecksum(buffer, 0, headerLength);
-            
+
             if (debug && debugLevel > 1) debug->print(" Header CheckSum: ");
             if (debug && debugLevel > 1) debug->print(headerChecksum, HEX);
             if (debug && debugLevel > 1) debug->print(", Calculated : ");
             if (debug && debugLevel > 1) debug->print(calculatedHeaderChecksum, HEX);
             if (debug && debugLevel > 1) debug->print(", Last: ");
             if (debug && debugLevel > 1) debug->println(buffer[position-3], HEX);
-			
-			// CRC Check
-			uint16_t frameChecksum = GetChecksum(position - 2);
-			uint16_t calculatedframeChecksum = Crc16.ComputeChecksum(buffer, 0, position - 2);
 
-			if (debug && debugLevel > 1) debug->print(" Frame CheckSum: ");
-			if (debug && debugLevel > 1) debug->print(frameChecksum, HEX);
-			if (debug && debugLevel > 1) debug->print(", Calculated : ");
-			if (debug && debugLevel > 1) debug->println(calculatedframeChecksum, HEX);
-			
-			if (headerChecksum != calculatedHeaderChecksum) {
-				if (debug && debugLevel > 1) debug->println("Mismatched header checksum. Reset");
-				if (netLog && debugLevel > 1) netLog("Mismatched header checksum. Reset");
-				Clear();
-                this->state = kHDLCState_Waiting;
-				return false;
-			}
+            // CRC Check
+            uint16_t frameChecksum = GetChecksum(position - 2);
+            uint16_t calculatedframeChecksum = Crc16.ComputeChecksum(buffer, 0, position - 2);
 
-			if (frameChecksum != calculatedframeChecksum) {
-				if (debug && debugLevel > 1) debug->println("Mismatched frame checksum. Reset");
-				if (netLog && debugLevel > 1) netLog("Mismatched frame checksum. Reset");
+            if (debug && debugLevel > 1) debug->print(" Frame CheckSum: ");
+            if (debug && debugLevel > 1) debug->print(frameChecksum, HEX);
+            if (debug && debugLevel > 1) debug->print(", Calculated : ");
+            if (debug && debugLevel > 1) debug->println(calculatedframeChecksum, HEX);
+
+            if (headerChecksum != calculatedHeaderChecksum) {
+              if (debug && debugLevel > 1) debug->println("Mismatched header checksum. Reset");
+              if (netLog && debugLevel > 1) netLog("Mismatched header checksum. Reset");
+              Clear();
+              this->state = kHDLCState_Waiting;
+              return false;
+            }
+
+            if (frameChecksum != calculatedframeChecksum) {
+              if (debug && debugLevel > 1) debug->println("Mismatched frame checksum. Reset");
+              if (netLog && debugLevel > 1) netLog("Mismatched frame checksum. Reset");
 /*
                 if (netLog && debugLevel > 1 && position < 64) {
                     char debuf[128];
@@ -296,16 +296,16 @@ bool DlmsReader::Read(byte data)
                     netLog("%s", debuf);
                 }
 */
-				Clear();
-                this->state = kHDLCState_Waiting;
-				return false;
+              Clear();
+              this->state = kHDLCState_Waiting;
+              return false;
             }
 
 
             // HDLC Header                  7e .... FCS
             // LLC Header                   E6 (format identifier) E7 (group identifier) 00 (group length)
             // Service Type                 0F Data-Notification
-            // Long Invoke-Id and Priority  40 
+            // Long Invoke-Id and Priority  40
 
             // Prepare for further reading.
             this->state = kHDLCState_Waiting;
@@ -325,7 +325,7 @@ bool DlmsReader::Read(byte data)
             //if (debug && debugLevel > 1) debug->print(position, HEX);
             //if (debug && debugLevel > 1) debug->print("\t");
             //if (debug && debugLevel > 1) debug->println(data, HEX);
-            
+
             buffer[position++] = data;
         }
     }
@@ -352,21 +352,21 @@ bool DlmsReader::GetUserDataBuffer(byte *&dataBuffer, int& length)
   if (debug && debugLevel > 1) debug->println(position, HEX);
 
   if (netLog && debugLevel > 1) netLog("DL: %x, Pos:%x", dataLength, position);
-  
-	if (dataLength > 0 && position - 2 == dataLength)
-	{
-		int headerLength = 4 + destinationAddressLength + sourceAddressLength + 2;
-		// int bytesWritten = 0;
-		dataBuffer = &(buffer[0+ headerLength]);
-		length = dataLength- headerLength -2;
 
-		return true;
-	}
-	else {
+  if (dataLength > 0 && position - 2 == dataLength)
+  {
+    int headerLength = 4 + destinationAddressLength + sourceAddressLength + 2;
+    // int bytesWritten = 0;
+    dataBuffer = &(buffer[0+ headerLength]);
+    length = dataLength- headerLength -2;
+
+    return true;
+  }
+  else {
     if (debug) debug->println("Invalid buffer length and position. Resetting.");
     Clear();
     return false;
-	}
+  }
 }
 
 /*
@@ -419,9 +419,9 @@ int DlmsReader::GetAddress(int addressPosition, byte* addressBuffer, int start, 
     for (int i = addressPosition; i < position; i++)
     {
         addressBuffer[addressBufferPos++] = buffer[i];
-        
+
         // LSB=1 means this was the last address byte
-        if ((buffer[i] & 0x01) == 0x01)  
+        if ((buffer[i] & 0x01) == 0x01)
             break;
 
         // See if we've reached last byte, try again when we've got more data
@@ -439,18 +439,18 @@ uint16_t DlmsReader::GetChecksum(int checksumPosition)
 
 void DlmsReader::debugPrint(byte *buffer, int start, int length)
 {
-	for (int i = start; i < start + length; i++)
-	{
-		if (buffer[i] < 0x10)
-			debug->print("0");
-		debug->print(buffer[i], HEX);
-		debug->print(" ");
-		if ((i - start + 1) % 16 == 0)
-			debug->println("");
-		else if ((i - start + 1) % 4 == 0)
-			debug->print(" ");
+  for (int i = start; i < start + length; i++)
+  {
+    if (buffer[i] < 0x10)
+      debug->print("0");
+    debug->print(buffer[i], HEX);
+    debug->print(" ");
+    if ((i - start + 1) % 16 == 0)
+      debug->println("");
+    else if ((i - start + 1) % 4 == 0)
+      debug->print(" ");
 
-		yield(); // Let other get some resources too
-	}
-	debug->println("");
+    yield(); // Let other get some resources too
+  }
+  debug->println("");
 }
