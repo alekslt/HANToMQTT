@@ -9,11 +9,9 @@
  * (Re)Programming should be done using OTA.
  *
  * Notes
- * 1. PubSubClient is included in the project due as I require to enlarge the buffer used and
- *    the Arduino IDE does not allow for an easy way to do this currently by setting a define here.
- *    The headers are compiled before this unit.
- * 2. Regarding the above. Currently we have enough RAM to not care about using both a string buffer to
- *    format the message and another for mqtt to send.
+ * 1. Using third party libraries: PubSubClient, NTPClient
+ * 2. Using Serial.swap() for ESP8266 due to main TX, RX being connected to usb-serial (for NodeMCU) change if needed.
+ * 3. Using UART1 on ESP8266 with pins defined below: RXD2, TXD2
  *
  * Aleksander Lygren Toppe
  * 2019.02.17
@@ -31,8 +29,13 @@ extern "C" {
 //#include "user_interface.h"
 }
 
+#if defined(ESP32)
+#include <WiFi.h> // Wifi
+#else
 #include <ESP8266WiFi.h> // Wifi
-//#include <WiFi.h> // Wifi
+#endif
+
+
 #include <EEPROM.h> // ??
 #include <ArduinoOTA.h> // For OTA Programming
 #include <NTPClient.h> // For NTP Wall Clock Time Syncronization
@@ -96,7 +99,7 @@ HardwareSerial* debugger = NULL;
 //DlmsReader reader;
 HanReader hanReader;
 //HanReaderTest hanTest;
-HardwareSerial HSerial1(1);
+//HardwareSerial HSerial1(1);
 HardwareSerial* hanPort;
 
 // Wifi and MQTT
@@ -345,9 +348,13 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 ////////////////////////////////
 
 void setupHAN() {
-  hanPort = &HSerial1;
-
   if (debugger) debugger->print("HAN MBUS Serial Setup Initializing...");
+
+  #if defined(ESP8266)
+  hanPort = &Serial;
+  #else
+  hanPort = new HardwareSerial(1);
+  #endif
 
   //if (debugger) {
   //  // Setup serial port for debugging
@@ -357,16 +364,21 @@ void setupHAN() {
   //  debugger->setDebugOutput(true);
   //}
 
-  if (hanPort) {
-    // Setup serial port for debugging
-    hanPort->begin(2400, SERIAL_8E1);
-    //hanPort->begin(2400,SERIAL_8E1, RXD2, TXD2);
-    //Serial.swap();
-    //hanPort->begin(115200, SERIAL_8E1);
-    //while (!&hanPort);
-    //debugger->println("Started...");
-    //debugger->setDebugOutput(true);
-  }
+  #if defined(ESP8266)
+  hanPort->begin(2400, SERIAL_8E1);
+  hanPort->swap();
+  #else
+  hanPort->begin(2400,SERIAL_8E1, RXD2, TXD2);
+  #endif
+
+  // Setup serial port for debugging
+
+  //hanPort->begin(2400,SERIAL_8E1, RXD2, TXD2);
+  //Serial.swap();
+  //hanPort->begin(115200, SERIAL_8E1);
+  //while (!&hanPort);
+  //debugger->println("Started...");
+  //debugger->setDebugOutput(true);
 
   hanReader.setNetworkLogger(mqttLogger);
   // initialize the HanReader
