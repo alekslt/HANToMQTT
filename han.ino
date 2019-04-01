@@ -25,14 +25,15 @@
 #include <map>
 //#include <set>
 
-extern "C" {
-//#include "user_interface.h"
-}
+
 
 #if defined(ESP32)
 #include <WiFi.h> // Wifi
 #else
 #include <ESP8266WiFi.h> // Wifi
+extern "C" {
+#include "user_interface.h"
+}
 #endif
 
 
@@ -80,7 +81,7 @@ const char* password = CONFIG_WIFI_PASSWORD;
 // NTP
 #define NTP_SERVER      CONFIG_NTP_SERVER
 
-#define REPORTING_DEBUG_PERIOD 10000
+#define REPORTING_DEBUG_PERIOD 60000
 
 #define RXD2 16
 #define TXD2 17
@@ -125,6 +126,17 @@ std::map<String, bool> obisCodesSeen;
 //bool(*fn_pt)(byte*,byte*) = fncomp;
 //std::set<byte*,bool(*)(byte*,byte*)> obisSet (fn_pt);
 
+
+// Util functions
+uint32_t getFreeHeap() {
+  #if defined(ESP32)
+  return ESP.getFreeHeap();
+  #else
+  return system_get_free_heap_size();
+  #endif
+}
+
+
 ////////////////////////////////
 // Setup - Entry point /////////
 ////////////////////////////////
@@ -147,10 +159,10 @@ void loop() {
   now = millis();
   if ((unsigned long)(now - lastUpdate) >= REPORTING_DEBUG_PERIOD) {
     lastUpdate = now;
-    //uint32_t freeHeap = system_get_free_heap_size();
-    //char buf[64];
-    //sprintf(buf, "Free heap: %u", freeHeap);
-    //mqttClient.publish(power_topic_debug, buf);
+    uint32_t freeHeap = getFreeHeap();
+    char buf[64];
+    sprintf(buf, "Free heap: %u", freeHeap);
+    mqttClient.publish(power_topic_debug, buf);
   }
   delay(10);
 }
