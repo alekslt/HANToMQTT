@@ -9,6 +9,7 @@
 #endif
 
 #include <vector>
+#include <map>
 //#include <ArduinoJson.h>
 #include "DlmsReader.h"
 
@@ -27,6 +28,9 @@ const byte TYPE_DATETIME = 0xf0; // Standard states that future interfaces will 
 
 const byte kObisCodeSize = 0x06;
 const byte kObisClockAndDeviation[] = { 0x00, 0x00, 0x01, 0x00, 0x00, 0xff };
+
+extern std::map<int, String> cosemTypeToString;
+extern std::map<byte, String> cosemEnumTypeToString;
 
 struct ClockDeviation {
   char dateTime[20];
@@ -56,7 +60,6 @@ struct ObisElement {
   String EnumString();
 
   void debugString(char* buf);
-  //void toArduinoJson(JsonObject& json);
 
   void Reset();
 };
@@ -70,13 +73,10 @@ public:
   std::vector<ObisElement*> cosemObjectList;
 
   HanReader();
-  void setup(HardwareSerial *hanPort);
   void setup(HardwareSerial *hanPort, Stream *debugPort);
-  void setup(HardwareSerial *hanPort, unsigned long baudrate, SerialConfig config, Stream *debugPort);
   void setNetworkLogger(LOG_FN function) { netLog = function; }
   bool read();
   bool read(byte data);
-  int getListSize();
 
 private:
   uint8_t debugLevel;
@@ -100,25 +100,4 @@ private:
   void debugPrint(byte *buffer, int start, int length);
 };
 
-/*
-class HanReaderTest
-{
-public:
-  //const uint8_t dataHeader = 8;
-  std::vector<ObisElement*> cosemObjectList;
-
-  HanReaderTest() {};
-
-private:
-  uint8_t debugLevel;
-  Stream *debug;
-  HardwareSerial *han;
-  //byte buffer[512];
-  int bytesRead;
-  DlmsReader reader;
-  int listSize;
-  byte* userData;
-  int userDataLen;
-};
-*/
 #endif

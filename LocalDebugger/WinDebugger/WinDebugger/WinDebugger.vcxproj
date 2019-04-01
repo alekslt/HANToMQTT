@@ -162,7 +162,13 @@
     <ClCompile Include="..\..\..\Crc16.cpp" />
     <ClCompile Include="..\..\..\DlmsReader.cpp" />
     <ClCompile Include="..\..\..\HanReader.cpp" />
+    <ClCompile Include="..\..\..\ObisElement.cpp" />
     <ClCompile Include="bridge_test.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\han.ino">
+      <FileType>CppClass</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

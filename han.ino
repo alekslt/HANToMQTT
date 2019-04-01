@@ -372,20 +372,13 @@ void setupHAN() {
   // initialize the HanReader
   // (passing Serial as the HAN port and Serial1 for debugging)
   //hanReader.setup(&Serial, &Serial1);
-  hanReader.setup(hanPort, 115200, SERIAL_8E1, debugger);
+  hanReader.setup(hanPort, debugger);
   if (debugger) debugger->println("Done");
 }
 
 void loopHAN() {
   // Read one byte from the port, and see if we got a full package
   if (hanReader.read()) {
-    // Get the list identifier
-    int listSize = hanReader.getListSize();
-
-    if (debugger) debugger->println("Preparing to send message");
-    if (debugger) debugger->print("List Size: ");
-    if (debugger) debugger->println(listSize);
-
     // Any generic useful info here
     //root["id"] = "espdebugger";
     //root["up"] = millis();
