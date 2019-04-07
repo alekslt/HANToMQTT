@@ -10,7 +10,6 @@
 
 #include <vector>
 #include <map>
-//#include <ArduinoJson.h>
 #include "DlmsReader.h"
 
 const byte TYPE_LIST = 0x01;
@@ -64,12 +63,9 @@ struct ObisElement {
   void Reset();
 };
 
-//typedef uint32_t SerialConfig;
-
 class HanReader
 {
 public:
-  //const uint8_t dataHeader = 8;
   std::vector<ObisElement*> cosemObjectList;
 
   HanReader();
@@ -83,7 +79,6 @@ private:
   Stream *debug;
   LOG_FN netLog;
   HardwareSerial *han;
-  //byte buffer[512];
   int bytesRead;
   DlmsReader reader;
   int listSize;

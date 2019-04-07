@@ -111,7 +111,7 @@ void ObisElement::Reset() {
   this->data->dataType = 0;
   this->data->stringLength = 0;
   delete this->data;
-
+  this->data = 0;
   this->enumType = 0;
   this->obisOctets = 0;
 }

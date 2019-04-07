@@ -403,31 +403,10 @@ void setupHAN() {
 void loopHAN() {
   // Read one byte from the port, and see if we got a full package
   if (hanReader.read()) {
-    // Any generic useful info here
-    //root["id"] = "espdebugger";
-    //root["up"] = millis();
-    //root["t"] = time;
-
     unsigned long epoch = timeClient.getEpochTime();
     String epochString = String(epoch);
 
-    // Add a sub-structure to the json object,
-    // to keep the data from the meter itself
-    //JsonArray& data = root.createNestedArray("data");
-    //char msg[512];
-
-    for (auto&& elem : hanReader.cosemObjectList) { // access by forwarding reference, the type of i is int&
-      //elem->debugString(buf);
-      //printf("%s\n", buf);
-      //JsonObject& jsonElem = data.createNestedObject();
-      // Define a json object to keep the data
-      //StaticJsonBuffer<512> jsonBuffer;
-      //JsonObject& root = jsonBuffer.createObject();
-      //elem->toArduinoJson(root);
-
-
-      //root["t"] = epoch;
-
+    for (auto&& elem : hanReader.cosemObjectList) {
       String subTopicRoot = power_topic;
       subTopicRoot += "/" + elem->ObisCodeString();
 
@@ -443,22 +422,16 @@ void loopHAN() {
         mqttClient.publish(subTopicUnit.c_str(), elem->EnumString().c_str(), true);
       }
 
+      // Delete each element as we iterate.
       elem->Reset();
       delete elem;
-
-      //root.printTo(msg, 512);
-      //debugger->println(msg);
-      //mqttClient.publish(subTopic.c_str(), msg);
     }
+
+    // Clear the list
     hanReader.cosemObjectList.clear();
 
+    // Signal that we're done updating a full notification list
     String subTopicListUpdated = String(power_topic) + "/list_updated";
     mqttClient.publish(subTopicListUpdated.c_str(), epochString.c_str());
-
-    // Write the json to the debug port
-    //root.printTo(Serial1);
-    //debugger->println("");
-
-    // Publish the json to the MQTT server
   }
 }
