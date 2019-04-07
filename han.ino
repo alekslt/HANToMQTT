@@ -136,6 +136,18 @@ uint32_t getFreeHeap() {
   #endif
 }
 
+unsigned long getEpochTime() {
+  return timeClient.getEpochTime();
+}
+
+char mqttLogBuf[100];
+void mqttLogger(const char *fmt, ...) {
+  va_list argptr;
+  va_start(argptr, fmt);
+  vsnprintf(mqttLogBuf, 100, fmt, argptr);
+  va_end(argptr);
+  mqttClient.publish(power_topic_debug, mqttLogBuf);
+}
 
 ////////////////////////////////
 // Setup - Entry point /////////
@@ -166,18 +178,6 @@ void loop() {
   }
   delay(10);
 }
-
-
-
-char mqttLogBuf[100];
-void mqttLogger(const char *fmt, ...) {
-  va_list argptr;
-  va_start(argptr, fmt);
-  vsnprintf(mqttLogBuf, 100, fmt, argptr);
-  va_end(argptr);
-  mqttClient.publish(power_topic_debug, mqttLogBuf);
-}
-
 
 void setupDebugPort() {
   // Uncomment to debug over the same port as used for HAN communication
@@ -393,6 +393,7 @@ void setupHAN() {
   //debugger->setDebugOutput(true);
 
   hanReader.setNetworkLogger(mqttLogger);
+  hanReader.setGetEpochTime(getEpochTime);
   // initialize the HanReader
   // (passing Serial as the HAN port and Serial1 for debugging)
   //hanReader.setup(&Serial, &Serial1);
@@ -403,8 +404,7 @@ void setupHAN() {
 void loopHAN() {
   // Read one byte from the port, and see if we got a full package
   if (hanReader.read()) {
-    unsigned long epoch = timeClient.getEpochTime();
-    String epochString = String(epoch);
+    String epochString = String(hanReader.messageTimestamp());
 
     for (auto&& elem : hanReader.cosemObjectList) {
       String subTopicRoot = power_topic;

@@ -167,7 +167,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\han.ino">
-      <FileType>CppClass</FileType>
+      <FileType>CppCode</FileType>
     </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

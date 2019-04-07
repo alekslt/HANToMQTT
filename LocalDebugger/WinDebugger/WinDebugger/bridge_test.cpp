@@ -8,12 +8,17 @@
 
 uint8_t open_serial(char* a, int b, char* c) { return 0; }
 
+unsigned long getEpochTime() {
+  return 12345;
+}
+
 int main(int argc, char *argv[]) {
   // The HAN Port reader
   HanReader hanReader;
   HardwareSerial Serial(0);
   Stream Serial1;
 
+  hanReader.setGetEpochTime(getEpochTime);
   hanReader.setup(&Serial, &Serial1);
 
   while (1) {

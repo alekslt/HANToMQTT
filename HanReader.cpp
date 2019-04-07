@@ -54,6 +54,7 @@ void HanReader::setup(HardwareSerial *hanPort, Stream *debugPort)
   debug = debugPort;
   reader.debug = debugPort;
   reader.debugLevel = debugLevel;
+  reader.getEpochTime = getEpochTime;
   reader.netLog = netLog;
 }
 

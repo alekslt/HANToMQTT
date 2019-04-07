@@ -70,13 +70,16 @@ public:
 
   HanReader();
   void setup(HardwareSerial *hanPort, Stream *debugPort);
+  void setGetEpochTime(GETEPOCHTIME_FN function) { getEpochTime = function; }
   void setNetworkLogger(LOG_FN function) { netLog = function; }
   bool read();
   bool read(byte data);
+  unsigned long messageTimestamp() { return reader.messageTimestamp; }
 
 private:
   uint8_t debugLevel;
   Stream *debug;
+  GETEPOCHTIME_FN getEpochTime;
   LOG_FN netLog;
   HardwareSerial *han;
   int bytesRead;

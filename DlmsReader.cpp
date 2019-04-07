@@ -50,6 +50,7 @@ bool DlmsReader::ReadOld(byte data)
         {
             if (debug && debugLevel > 1) debug->print("Start: ");
             if (debug && debugLevel > 1) debug->println(data, HEX);
+            messageTimestamp = getEpochTime();
             // This was the start flag, we're not done yet
             return false;
         }

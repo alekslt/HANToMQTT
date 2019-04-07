@@ -10,6 +10,7 @@
 #endif
 
 typedef void(*LOG_FN)(const char *fmt, ...);
+typedef unsigned long(*GETEPOCHTIME_FN)(void);
 
 #define DLMS_READER_BUFFER_SIZE 512
 #define DLMS_READER_MAX_ADDRESS_SIZE 5
@@ -21,7 +22,9 @@ class DlmsReader
   public:
     uint8_t debugLevel;
     Stream *debug;
+    GETEPOCHTIME_FN getEpochTime;
     LOG_FN netLog;
+    unsigned long messageTimestamp;
 
     DlmsReader();
     bool Read(byte data);
