@@ -1,4 +1,5 @@
 #include "HanReader.h"
+#include "ObisElement.h"
 #include <ArduinoJson.h>
 #include <map>
 

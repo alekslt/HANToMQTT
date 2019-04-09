@@ -154,6 +154,7 @@
     <ClInclude Include="..\..\..\Crc16.h" />
     <ClInclude Include="..\..\..\DlmsReader.h" />
     <ClInclude Include="..\..\..\HanReader.h" />
+    <ClInclude Include="..\..\..\ObisElement.h" />
     <ClInclude Include="..\..\..\WProgram.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />

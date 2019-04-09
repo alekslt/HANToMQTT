@@ -3,7 +3,9 @@
 
 #include <ArduinoJson.h>
 
+#include "ObisElement.h"
 #include "HanReader.h"
+
 //#include "Aidon.h"
 
 uint8_t open_serial(char* a, int b, char* c) { return 0; }

@@ -48,6 +48,7 @@ extern "C" {
 //#define MQTT_MAX_PACKET_SIZE 512
 #include <PubSubClient.h> // MQTT
 
+#include "ObisElement.h"
 #include "HanReader.h"
 
 // Configuration - Sensitive defines/passwords/adresses

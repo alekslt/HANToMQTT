@@ -1,5 +1,6 @@
 
-#include "HanReader.h"
+//#include "HanReader.h"
+#include "ObisElement.h"
 
 void ObisElement::debugString(char* buf) {
   sprintf(buf, "Object: ObisCode:%d.%d.%d.%d.%d.%d  Type:%x(%s) Value: ",
