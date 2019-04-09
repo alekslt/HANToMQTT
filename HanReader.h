@@ -2,10 +2,10 @@
 #define _HANREADER_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
-  #include "arduino.h"
-  #include <HardwareSerial.h>
+#include "arduino.h"
+#include <HardwareSerial.h>
 #else
-  #include "WProgram.h"
+#include "WProgram.h"
 #endif
 
 #include <vector>

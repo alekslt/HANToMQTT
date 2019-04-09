@@ -4,9 +4,9 @@
 #include "Crc16.h"
 
 #if defined(ARDUINO) && ARDUINO >= 100
-  #include "arduino.h"
+#include "arduino.h"
 #else
-  #include "WProgram.h"
+#include "WProgram.h"
 #endif
 
 typedef void(*LOG_FN)(const char *fmt, ...);
@@ -15,44 +15,45 @@ typedef unsigned long(*GETEPOCHTIME_FN)(void);
 #define DLMS_READER_BUFFER_SIZE 512
 #define DLMS_READER_MAX_ADDRESS_SIZE 5
 
-enum HDLCState { kHDLCState_Waiting, kHDLCState_Data, kHDLCState_Escaped};
+enum HDLCState { kHDLCState_Waiting, kHDLCState_Data, kHDLCState_Escaped };
 
 class DlmsReader
 {
-  public:
-    uint8_t debugLevel;
-    Stream *debug;
-    GETEPOCHTIME_FN getEpochTime;
-    LOG_FN netLog;
-    unsigned long messageTimestamp;
+public:
+  uint8_t debugLevel;
+  Stream *debug;
+  GETEPOCHTIME_FN getEpochTime;
+  LOG_FN netLog;
 
-    DlmsReader();
-    bool Read(byte data);
-    bool ReadOld(byte data);
-    bool GetUserDataBuffer(byte *&dataBuffer, int& length);
-    //int GetRawData(byte *buffer, int start, int length);
+  unsigned long messageTimestamp;
 
-  protected:
-    Crc16Class Crc16;
+  DlmsReader();
+  bool Read(byte data);
+  bool ReadOld(byte data);
+  bool GetUserDataBuffer(byte *&dataBuffer, int& length);
+  //int GetRawData(byte *buffer, int start, int length);
 
-  private:
-    byte buffer[DLMS_READER_BUFFER_SIZE];
-    int position;
-    int dataLength;
-    HDLCState state;
+protected:
+  Crc16Class Crc16;
 
-    byte frameFormatType;
-    byte destinationAddress[DLMS_READER_MAX_ADDRESS_SIZE];
-    byte destinationAddressLength;
-    byte sourceAddress[DLMS_READER_MAX_ADDRESS_SIZE];
-    byte sourceAddressLength;
+private:
+  byte buffer[DLMS_READER_BUFFER_SIZE];
+  int position;
+  int dataLength;
+  HDLCState state;
 
-    void Clear();
-    int GetAddress(int addressPosition, byte* buffer, int start, int length);
-    unsigned short GetChecksum(int checksumPosition);
-    bool IsValidFrameFormat(byte frameFormatType);
-    void WriteBuffer();
-    void debugPrint(byte *buffer, int start, int length);
+  byte frameFormatType;
+  byte destinationAddress[DLMS_READER_MAX_ADDRESS_SIZE];
+  byte destinationAddressLength;
+  byte sourceAddress[DLMS_READER_MAX_ADDRESS_SIZE];
+  byte sourceAddressLength;
+
+  void Clear();
+  int GetAddress(int addressPosition, byte* buffer, int start, int length);
+  unsigned short GetChecksum(int checksumPosition);
+  bool IsValidFrameFormat(byte frameFormatType);
+  void WriteBuffer();
+  void debugPrint(byte *buffer, int start, int length);
 };
 
 #endif

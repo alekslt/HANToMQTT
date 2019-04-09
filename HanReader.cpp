@@ -7,7 +7,7 @@
 #include <math.h>
 #else
 extern "C" {
-//#include "user_interface.h"
+  //#include "user_interface.h"
 }
 #endif
 
@@ -293,7 +293,7 @@ bool HanReader::read(byte data)
       userData[1] != 0xE7 ||
       userData[2] != 0x00 ||
       userData[3] != 0x0F
-    )
+      )
     {
       if (debug) debug->println("Invalid HAN data: Start should be E6 E7 00 0F");
       return false;
@@ -301,7 +301,7 @@ bool HanReader::read(byte data)
     if (debug) debug->println("HAN dataheader is valid");
     int firstStructurePos = 9;
     byte dataType = userData[firstStructurePos];
-    uint8_t listLength = userData[firstStructurePos+1];
+    uint8_t listLength = userData[firstStructurePos + 1];
 
     if (dataType != TYPE_LIST)
     {
@@ -316,7 +316,8 @@ bool HanReader::read(byte data)
       ObisElement* obisElement = new ObisElement();
       if (decodeListElement(curPos, obisElement)) {
         this->cosemObjectList.push_back(obisElement);
-      } else {
+      }
+      else {
         obisElement->Reset();
         delete obisElement;
       }

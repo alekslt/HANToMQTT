@@ -11,7 +11,7 @@ using namespace std;
 #ifdef _WIN32
 static bool ioctl(int a, int b, int* c) { return false; }
 static bool read(int a, unsigned char* b, int c) { return false; };
-static bool open(char* a, int b) { return false;  }
+static bool open(char* a, int b) { return false; }
 #define O_RDONLY 0
 static void usleep(int a) {};
 static void yield() {};
@@ -44,13 +44,14 @@ public:
   void print(int str, int type) {
     if (type == HEX) {
       printf("%x", str);
-    } else {
+    }
+    else {
       printf("%d", str);
     }
   }
 
   void print(byte str) {
-    print ((int)str, 0);
+    print((int)str, 0);
   }
 
   void print(int str) {
@@ -129,7 +130,8 @@ public:
   bool available() {
     if (this->msgPos < this->elements) {
       return true;
-    } else {
+    }
+    else {
       //this->msgPos = 0;
       //sleep(1000);
       return false;
@@ -150,7 +152,7 @@ public:
     while (1) {
       n = ::read(fd, buf, len);
 
-      if (n>=0) {
+      if (n >= 0) {
         break;
       }
       if (errno == EAGAIN) {
@@ -167,7 +169,7 @@ public:
     const char *pos = test_list2;
     /* WARNING: no sanitization or error-checking whatsoever */
     uint32_t stringLength = strlen(test_list2);
-    elements = (uint32_t)round((stringLength+1) / 3);
+    elements = (uint32_t)round((stringLength + 1) / 3);
     //elements += 2;
     for (size_t count = 0; count < elements; count++) {
       sscanf(pos, "%2hhx", &this->message[count]);
