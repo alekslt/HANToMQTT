@@ -5,7 +5,7 @@
 #include <string>
 using namespace std;
 #include <stdio.h>
-
+#include <stdlib.h>
 
 
 #ifdef _WIN32
@@ -120,6 +120,7 @@ public:
   uint32_t elements;
   uint32_t msgLen = 44;
   unsigned char message[512];
+  unsigned char *replay;
 
   void begin(unsigned long baudrate, SerialConfig config) {
     if (baudrate || config.parameter) {
@@ -144,7 +145,9 @@ public:
   }
 
   byte read() {
-    return this->message[this->msgPos++];
+    //return this->message[this->msgPos++];
+    return this->replay[this->msgPos++];
+        
 
     int n;
     unsigned char buf[2];
@@ -164,10 +167,9 @@ public:
 
 
   HardwareSerial(int read_fd) {
-    fd = read_fd;
-
+    /*
     const char *pos = test_list2;
-    /* WARNING: no sanitization or error-checking whatsoever */
+    // WARNING: no sanitization or error-checking whatsoever 
     uint32_t stringLength = strlen(test_list2);
     elements = (uint32_t)round((stringLength + 1) / 3);
     //elements += 2;
@@ -175,6 +177,21 @@ public:
       sscanf(pos, "%2hhx", &this->message[count]);
       pos += 3;
     }
+    */
+
+    fd = read_fd;
+
+    FILE *f = fopen("U:/han/data/han-data-8144.dat", "rb");
+    fseek(f, 0, SEEK_END);
+    elements = ftell(f);
+    fseek(f, 0, SEEK_SET);  /* same as rewind(f); */
+
+    replay = (unsigned char*)malloc(elements + 1);
+    fread(replay, 1, elements, f);
+    fclose(f);
+
+    //string[fsize] = 0;
+
   }
 };
 
