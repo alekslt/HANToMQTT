@@ -27,8 +27,10 @@
 
 
 
+
 #if defined(ESP32)
 #include <WiFi.h> // Wifi
+#include <esp_task_wdt.h>
 #else
 #include <ESP8266WiFi.h> // Wifi
 extern "C" {
@@ -85,6 +87,7 @@ const char* password = CONFIG_WIFI_PASSWORD;
 #define NTP_SERVER      CONFIG_NTP_SERVER
 
 #define REPORTING_DEBUG_PERIOD 60000
+#define WATCHDOG_TIMEOUT_PERIOD 60000
 
 #define RXD2 16
 #define TXD2 17
@@ -128,6 +131,7 @@ NTPClient timeClient(
 
 unsigned long now;
 unsigned long lastUpdate = 0;
+unsigned long lastHANMessage = 0;
 
 
 std::map<String, bool> obisCodesSeen;
@@ -181,6 +185,14 @@ void sendBuffer(byte* buf, int len) {
   }
 }
 
+void hard_restart() {
+  #if defined(ESP32)
+  esp_task_wdt_init(1,true);
+  esp_task_wdt_add(NULL);
+  #endif
+  while(true);
+}
+
 ////////////////////////////////
 // Setup - Entry point /////////
 ////////////////////////////////
@@ -208,6 +220,13 @@ void loop() {
     sprintf(buf, "Free heap: %u", freeHeap);
     mqttClient.publish(power_topic_debug, buf);
   }
+
+  if ((unsigned long)(now - lastHANMessage) >= WATCHDOG_TIMEOUT_PERIOD) {
+    mqttClient.publish(power_topic_debug, "Critical error. No M-Bus data in 60 seconds. Rebooting.");
+    delay(100);
+    hard_restart();
+  }
+
   delay(10);
 }
 
@@ -431,6 +450,7 @@ void setupHAN() {
   // (passing Serial as the HAN port and Serial1 for debugging)
   //hanReader.setup(&Serial, &Serial1);
   hanReader.setup(hanPort, debugger);
+  lastHANMessage = millis();
   if (debugger) debugger->println("Done");
 }
 
@@ -466,5 +486,7 @@ void loopHAN() {
     // Signal that we're done updating a full notification list
     String subTopicListUpdated = String(power_topic) + "/list_updated";
     mqttClient.publish(subTopicListUpdated.c_str(), epochString.c_str());
+
+    lastHANMessage = millis();
   }
 }
