@@ -92,6 +92,7 @@ const char* password = CONFIG_WIFI_PASSWORD;
 #define RXD2 16
 #define TXD2 17
 
+//#define PC_SERIAL_DEBUGGING 1
 ////////////////////////////////
 // Forward declerations ////////
 ////////////////////////////////
@@ -442,6 +443,10 @@ void setupHAN() {
   //while (!&hanPort);
   //debugger->println("Started...");
   //debugger->setDebugOutput(true);
+
+  #if defined(PC_SERIAL_DEBUGGING)
+  hanPort = &Serial;
+  #endif
 
   hanReader.setNetworkLogger(mqttLogger);
   hanReader.setSendBuffer(sendBuffer);
