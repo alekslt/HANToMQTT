@@ -23,6 +23,8 @@ bool DlmsReader::ReadOld(byte data)
 
   if (position == 0 && data != 0x7E)
   {
+    buffer[0] = data;
+    sendBuffer(buffer, 1);
     // we haven't started yet, wait for the start flag (no need to capture any data yet)
     return false;
   }
@@ -35,6 +37,7 @@ bool DlmsReader::ReadOld(byte data)
 
     // Check if we're about to run into a buffer overflow
     if (position >= DLMS_READER_BUFFER_SIZE) {
+      if (debug && debugLevel > 1) debug->println("Reset to prevent buffer overflow.");
       Clear();
     }
 
@@ -42,6 +45,7 @@ bool DlmsReader::ReadOld(byte data)
     if (position == 1 && data == 0x7E)
     {
       if (debug && debugLevel > 1) debug->println("Second Start: 7E");
+      sendBuffer(buffer, position);
       // just return, we can keep the one byte we had in the buffer
       return false;
     }
@@ -64,6 +68,7 @@ bool DlmsReader::ReadOld(byte data)
       printf(" Frameformat: %x Valid: %d\n", frameFormatType, IsValidFrameFormat(frameFormatType));
       if (!IsValidFrameFormat(frameFormatType)) {
         if (netLog && debugLevel > 1) netLog("FF: %x, V:%d", frameFormatType, IsValidFrameFormat(frameFormatType));
+        sendBuffer(buffer, position);
         Clear();
       }
 
@@ -82,6 +87,7 @@ bool DlmsReader::ReadOld(byte data)
       destinationAddressLength = GetAddress(3, destinationAddress, 0, DLMS_READER_MAX_ADDRESS_SIZE);
       if (destinationAddressLength > 3) {
         printf(" dst addr > max addr size. %d\n", destinationAddressLength);
+        sendBuffer(buffer, position);
         Clear();
       }
 
@@ -93,6 +99,7 @@ bool DlmsReader::ReadOld(byte data)
       sourceAddressLength = GetAddress(3 + destinationAddressLength, sourceAddress, 0, DLMS_READER_MAX_ADDRESS_SIZE);
       if (sourceAddressLength > 3) {
         printf(" src addr > max addr size. %d\n", sourceAddressLength);
+        sendBuffer(buffer, position);
         Clear();
       }
 
@@ -108,6 +115,7 @@ bool DlmsReader::ReadOld(byte data)
       printf(" Header CheckSum: %x, Calculated : %x\n", headerChecksum, calculatedChecksum);
       if (headerChecksum != calculatedChecksum) {
         if (netLog && debugLevel > 1) netLog("Mismatched header checksum. Reset");
+        sendBuffer(buffer, position);
         Clear();
       }
 
@@ -123,6 +131,7 @@ bool DlmsReader::ReadOld(byte data)
       printf(" CheckSum: %x, CalcCheck: %x, Pos:%x, dataLength:%x \n", checksum, calculatedChecksum, position, dataLength);
       if (checksum != calculatedChecksum) {
         if (netLog && debugLevel > 1) netLog("Mismatched frame checksum. Reset. Pos: %x. CheckP:%x, CheckC:%x, DL: %x", position, checksum, calculatedChecksum, dataLength);
+        sendBuffer(buffer, position);
         if (false && netLog && debugLevel > 1) {
           char debuf[128];
           int kChunkSize = 45;
@@ -149,6 +158,7 @@ bool DlmsReader::ReadOld(byte data)
       // We're done, check the stop flag and signal we're done
       if (data == 0x7E) {
         printf("Stop: %x, Pos:%x, dataLength:%x \n", data, position, dataLength);
+        sendBuffer(buffer, position);
         return true;
       }
       else

@@ -26,6 +26,7 @@ public:
   void setup(HardwareSerial *hanPort, Stream *debugPort);
   void setGetEpochTime(GETEPOCHTIME_FN function) { getEpochTime = function; }
   void setNetworkLogger(LOG_FN function) { netLog = function; }
+  void setSendBuffer(SENDBUFFER_FN function) { sendBuffer = function; }
   bool read();
   bool read(byte data);
   unsigned long messageTimestamp() { return reader.messageTimestamp; }
@@ -35,6 +36,7 @@ private:
   Stream *debug;
   GETEPOCHTIME_FN getEpochTime;
   LOG_FN netLog;
+  SENDBUFFER_FN sendBuffer;
   HardwareSerial *han;
   int bytesRead;
   DlmsReader reader;

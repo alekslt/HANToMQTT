@@ -9,7 +9,8 @@
 #include "WProgram.h"
 #endif
 
-typedef void(*LOG_FN)(const char *fmt, ...);
+typedef void(*LOG_FN)(const char* fmt, ...);
+typedef void(*SENDBUFFER_FN)(byte* buf, int len);
 typedef unsigned long(*GETEPOCHTIME_FN)(void);
 
 #define DLMS_READER_BUFFER_SIZE 512
@@ -24,6 +25,7 @@ public:
   Stream *debug;
   GETEPOCHTIME_FN getEpochTime;
   LOG_FN netLog;
+  SENDBUFFER_FN sendBuffer;
 
   unsigned long messageTimestamp;
 

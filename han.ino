@@ -75,9 +75,11 @@ const char* password = CONFIG_WIFI_PASSWORD;
 #define MQTT_MYNAME      OTA_HOSTNAME" Client"
 
 #define power_topic_base    "kdg/sensors/powermeterhan"
+//#define power_topic_base    "test/powermeterhan"
 #define power_topic         power_topic_base"/obis"
 #define power_topic_command power_topic_base"/commands"
 #define power_topic_debug   power_topic_base"/debug"
+#define power_topic_raw    "raw/powermeterhan"
 
 // NTP
 #define NTP_SERVER      CONFIG_NTP_SERVER
@@ -91,6 +93,13 @@ const char* password = CONFIG_WIFI_PASSWORD;
 // Forward declerations ////////
 ////////////////////////////////
 void onMqttMessage(char* topic, byte* payload, unsigned int length);
+
+
+
+// Macros
+#if defined(ESP32) or defined(ESP8266)
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
 ////////////////////////////////
 // Complex Variables
@@ -148,6 +157,28 @@ void mqttLogger(const char *fmt, ...) {
   vsnprintf(mqttLogBuf, 100, fmt, argptr);
   va_end(argptr);
   mqttClient.publish(power_topic_debug, mqttLogBuf);
+}
+
+void sendBuffer(byte* buf, int len) {
+  if (mqttClient.beginPublish(power_topic_raw, len, false)) {
+    uint16_t bytesRemaining = len;
+    uint8_t kMaxBytesToWrite = 64;
+    uint8_t bytesToWrite;
+    uint16_t bytesWritten = 0;
+    uint16_t rc;
+    bool result = true;
+
+    while((bytesRemaining > 0) && result) {
+      bytesToWrite = min(bytesRemaining, kMaxBytesToWrite);
+      //bytesToWrite = bytesRemaining;
+      rc = mqttClient.write(&(buf[bytesWritten]), bytesToWrite);
+      //result = (rc == bytesToWrite);
+      bytesRemaining -= rc;
+      bytesWritten += rc;
+    }
+
+    mqttClient.endPublish();
+  }
 }
 
 ////////////////////////////////
@@ -394,6 +425,7 @@ void setupHAN() {
   //debugger->setDebugOutput(true);
 
   hanReader.setNetworkLogger(mqttLogger);
+  hanReader.setSendBuffer(sendBuffer);
   hanReader.setGetEpochTime(getEpochTime);
   // initialize the HanReader
   // (passing Serial as the HAN port and Serial1 for debugging)

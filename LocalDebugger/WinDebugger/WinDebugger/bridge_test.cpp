@@ -1,8 +1,6 @@
 
 #include <inttypes.h>
 
-#include <ArduinoJson.h>
-
 #include "ObisElement.h"
 #include "HanReader.h"
 
@@ -14,37 +12,43 @@ unsigned long getEpochTime() {
   return 12345;
 }
 
+void sendBuffer(byte* buf, int len) {
+  if (true) {
+    int16_t bytesRemaining = len;
+    int16_t bytesToWrite;
+    int16_t bytesWritten = 0;
+    size_t rc;
+    bool result = true;
+
+    while ((bytesRemaining > 0) && result) {
+      bytesToWrite = bytesRemaining;
+      rc = printf("%x", &(buf[bytesWritten]));
+      //rc = mqttClient.write(&(buf[bytesWritten]), bytesToWrite);
+      //result = (rc == bytesToWrite);
+      bytesRemaining -= rc;
+      bytesWritten += rc;
+    }
+  }
+}
+
 int main(int argc, char *argv[]) {
   // The HAN Port reader
   HanReader hanReader;
   HardwareSerial Serial(0);
   Stream Serial1;
 
+  hanReader.setSendBuffer(sendBuffer);
   hanReader.setGetEpochTime(getEpochTime);
   hanReader.setup(&Serial, &Serial1);
 
   while (1) {
     // Read one byte from the port, and see if we got a full package
     if (hanReader.read()) {
-      // Define a json object to keep the data
-      StaticJsonBuffer<4096> jsonBuffer;
-      JsonObject& root = jsonBuffer.createObject();
-
-      // Any generic useful info here
-      root["id"] = "espdebugger";
-      //root["up"] = millis();
-      //root["t"] = time;
-
-      // Add a sub-structure to the json object, 
-      // to keep the data from the meter itself
-      JsonArray& data = root.createNestedArray("data");
-
-      //char buf[128];
 
       for (auto&& elem : hanReader.cosemObjectList) { // access by forwarding reference, the type of i is int&
         //elem->debugString(buf);
         //printf("%s\n", buf);
-        JsonObject& jsonElem = data.createNestedObject();
+
         elem->ValueString();
         elem->EnumString();
 
@@ -56,11 +60,6 @@ int main(int argc, char *argv[]) {
       // Write the json to the debug port
       //root.printTo(Serial1);
       //Serial1.println("");
-
-      // Publish the json to the MQTT server
-      char msg[1024];
-      root.printTo(msg, 1024);
-      Serial1.println(msg);
     }
     fflush(stdout);
   }

@@ -57,6 +57,7 @@ void HanReader::setup(HardwareSerial *hanPort, Stream *debugPort)
   reader.debugLevel = debugLevel;
   reader.getEpochTime = getEpochTime;
   reader.netLog = netLog;
+  reader.sendBuffer = sendBuffer;
 }
 
 void HanReader::printObjectStart(uint16_t pos) {
@@ -276,7 +277,7 @@ bool HanReader::read(byte data)
       debug->print("Got valid DLMS data (");
       debug->print(userDataLen);
       debug->println(" bytes):");
-      debugPrint(userData, 0, userDataLen);
+      //debugPrint(userData, 0, userDataLen);
 
       debug->print("First UserData Byte:");
       debug->print(userData[0], HEX);
