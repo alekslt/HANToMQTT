@@ -118,7 +118,8 @@ HanReader hanReader;
 HardwareSerial* hanPort;
 
 // Wifi and MQTT
-WiFiClientSecure espClient;
+WiFiClient espClient;
+//WiFiClientSecure espClient;
 PubSubClient mqttClient(espClient);
 
 // NTP
