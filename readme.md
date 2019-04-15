@@ -11,11 +11,14 @@ The units is stored in a persistent topic and you will get them on subscription/
 I'm currently hard coding the secrets (ssid/psk/server adresses/...) in a file secret.h,
 I've included an example of this file.
 
+The raw M-Bus data is also sent over MQTT on a "raw/powermeterhan" topic.
 
 # !!! Known Issues !!!
 
-There is an instability bug that hangs the system after ~10 days.
-Probably an out of memory issue, but I haven't had time to debug.
+## Instability/Corruption [Status: Mitigated]
+
+There is an instability-issue where the system either loses connection or does not receive new HAN-data after a weeks time or so.
+Does not look to be an OOM issue. Currently there's code in now that triggers a watchdog if no new HAN-message is received in 60 seconds, and restarts the device. I'm gathering more log samples to track down this issue.
 
 
 # MQTT Messages
