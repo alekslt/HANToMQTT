@@ -13,13 +13,27 @@ I've included an example of this file.
 
 The raw M-Bus data is also sent over MQTT on a "raw/powermeterhan" topic.
 
+# Compiling
+
+Should compile fine with the Arduino IDE using either ESP8266 or ESP32 board.
+
+Third party libraries used in this code is:
+* PubSubClient [https://github.com/knolleary/pubsubclient]
+* NTPClient [https://github.com/arduino-libraries/NTPClient]
+
+Storage / Memory usage-wise:
+```
+Sketch uses 795458 bytes (60%) of program storage space. Maximum is 1310720 bytes.
+Global variables use 43556 bytes (13%) of dynamic memory, leaving 284124 bytes for local variables. Maximum is 327680 bytes.
+```
+
+
 # !!! Known Issues !!!
 
-## Instability/Corruption [Status: Mitigated]
+## Instability [Status: Mitigated]
 
 There is an instability-issue where the system either loses connection or does not receive new HAN-data after a weeks time or so.
 Does not look to be an OOM issue. Currently there's code in now that triggers a watchdog if no new HAN-message is received in 60 seconds, and restarts the device. I'm gathering more log samples to track down this issue.
-
 
 # MQTT Messages
 
