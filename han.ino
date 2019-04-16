@@ -62,7 +62,7 @@ extern "C" {
 // for you. ////////////////////
 ////////////////////////////////
 #define USE_ARDUINO_OTA
-#define OTA_HOSTNAME "esp-powermeter-test2"
+#define OTA_HOSTNAME "esp-pwrhan-1"
 #define OTA_PASSWORD CONFIG_OTA_PASSWORD
 
 // WiFi
@@ -74,7 +74,7 @@ const char* password = CONFIG_WIFI_PASSWORD;
 #define MQTT_SERVERPORT  CONFIG_MQTT_SERVERPORT                   // 8883 for MQTTS
 #define MQTT_USERNAME    ""
 #define MQTT_KEY         ""
-#define MQTT_MYNAME      OTA_HOSTNAME" Client"
+#define MQTT_MYNAME      OTA_HOSTNAME"_client"
 
 #define power_topic_base    "kdg/sensors/powermeterhan"
 //#define power_topic_base    "test/powermeterhan"
@@ -237,11 +237,22 @@ void loop() {
 }
 
 void setupDebugPort() {
-  // Uncomment to debug over the same port as used for HAN communication
+  #if defined(ESP32)
+  // We always want debuginfo in ESP32
   debugger = &Serial;
-
+  debugger->setDebugOutput(true);
+  #else
+  // We send debug info on serial1 for ESP8266 unless
+  #if defined(PC_SERIAL_DEBUGGING)
+  debugger = &Serial;
+  #else
+  debugger = &Serial1;
+  #endif // #else defined(PC_SERIAL_DEBUGGING)
+  debugger->begin(115200);
+  debugger->setDebugOutput(true);
+  #endif // #else ESP32
   // initialize serial communication at 9600 bits per second:
-  Serial.begin(115200); //115200 2400
+  //Serial.begin(115200); //115200 2400
   //Serial.println("Serial debugging port initialized");
   // Initialize the Serial1 port for debugging
   // (This port is fixed to Pin2 of the ESP8266)
@@ -419,38 +430,19 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 void setupHAN() {
   if (debugger) debugger->print("HAN MBUS Serial Setup Initializing...");
 
-  #if defined(ESP8266)
+
+  #if defined(PC_SERIAL_DEBUGGING)
+  // Debug over UBS-Serial adapter to PC
   hanPort = &Serial;
   #else
-  hanPort = new HardwareSerial(1);
-  #endif
-
-  //if (debugger) {
-  //  // Setup serial port for debugging
-  //  debugger->begin(2400, SERIAL_8E1);
-  //  while (!&debugger);
-  //  debugger->println("Started...");
-  //  debugger->setDebugOutput(true);
-  //}
-
   #if defined(ESP8266)
+  hanPort = &Serial;
   hanPort->begin(2400, SERIAL_8E1);
   hanPort->swap();
   #else
+  hanPort = new HardwareSerial(1);
   hanPort->begin(2400,SERIAL_8E1, RXD2, TXD2);
   #endif
-
-  // Setup serial port for debugging
-
-  //hanPort->begin(2400,SERIAL_8E1, RXD2, TXD2);
-  //Serial.swap();
-  //hanPort->begin(115200, SERIAL_8E1);
-  //while (!&hanPort);
-  //debugger->println("Started...");
-  //debugger->setDebugOutput(true);
-
-  #if defined(PC_SERIAL_DEBUGGING)
-  hanPort = &Serial;
   #endif
 
   hanReader.setNetworkLogger(mqttLogger);
