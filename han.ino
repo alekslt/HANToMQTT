@@ -212,7 +212,11 @@ void loop() {
   loopOTA();
   loopNTPClient();
   loopMqtt();
-  loopHAN();
+
+  // Give more time to read data from HAN
+  for (int i=0; i<4; i++) {
+    loopHAN();
+  }
 
   now = millis();
   if ((unsigned long)(now - lastUpdate) >= REPORTING_DEBUG_PERIOD) {
