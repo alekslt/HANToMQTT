@@ -13,6 +13,10 @@ I've included an example of this file.
 
 The raw M-Bus data is also sent over MQTT on a "raw/powermeterhan" topic.
 
+## PS
+
+I have a AIDON meter from Hafslund, and while I don't think there should be large changes required to the code, if any, to support Kaifa or Kamstrup, these models are not tested and may not work correctly.
+
 # Compiling
 
 Should compile fine with the Arduino IDE using either ESP8266 or ESP32 board.
