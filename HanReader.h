@@ -40,7 +40,6 @@ private:
   HardwareSerial *han;
   int bytesRead;
   DlmsReader reader;
-  int listSize;
   byte* userData;
   int userDataLen;
 
@@ -50,6 +49,8 @@ private:
   bool decodeAndApplyScalerElement(uint16_t& nextPos, ObisElement* element);
   bool decodeDataElement(uint16_t& nextPos, Element& element);
   bool decodeListElement(uint16_t& nextPos, ObisElement* obisElement);
+  bool decodeAidonMeter();
+  bool decodeKaifaKamstrupMeter();
 
   void debugPrint(byte *buffer, int start, int length);
 };

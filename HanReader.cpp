@@ -300,32 +300,105 @@ bool HanReader::read(byte data)
       return false;
     }
     if (debug) debug->println("HAN dataheader is valid");
+
+
+    // So this is where we need to differentiate between Aidon, Kaifa and Kamstrup meters.
+    // From what I've gathered Kaifa and Kamstrup shows in an untyped datetime with just
+    // the length is a preamble. We still start with +9 position into the PDU.
     int firstStructurePos = 9;
-    byte dataType = userData[firstStructurePos];
-    uint8_t listLength = userData[firstStructurePos + 1];
 
-    if (dataType != TYPE_LIST)
-    {
-      if (debug) debug->println("Error. We expect the root element to be a list.");
-      return false;
+    // If the byte is 0x0C then we can assume that it is Kaifa or Kamstrup
+    byte firstByte = userData[firstStructurePos];
+    if (firstByte == 0x0C) {
+      // We don't support Kaifa or Kamstrup yet.
+      return decodeKaifaKamstrupMeter();
     }
-    uint16_t curPos = firstStructurePos + 2;
-    for (int listItemIndex = 0; listItemIndex < listLength; listItemIndex++) {
-      if (debug) debug->print("Decoding element: ");
-      if (debug) debug->println(listItemIndex);
-
-      ObisElement* obisElement = new ObisElement();
-      if (decodeListElement(curPos, obisElement)) {
-        this->cosemObjectList.push_back(obisElement);
-      }
-      else {
-        obisElement->Reset();
-        delete obisElement;
-      }
+    else {
+      return decodeAidonMeter();
     }
-    listSize = listLength;
-    return true;
   }
+  return false;
+}
+
+bool HanReader::decodeAidonMeter() {
+  int firstStructurePos = 9;
+  byte dataType = userData[firstStructurePos];
+  uint8_t listLength = userData[firstStructurePos + 1];
+
+  if (dataType != TYPE_LIST)
+  {
+    if (debug) debug->println("Error. We expect the root element to be a list.");
+    return false;
+  }
+  uint16_t curPos = firstStructurePos + 2;
+  for (int listItemIndex = 0; listItemIndex < listLength; listItemIndex++) {
+    if (debug) debug->print("Decoding element: ");
+    if (debug) debug->println(listItemIndex);
+
+    ObisElement* obisElement = new ObisElement();
+    if (decodeListElement(curPos, obisElement)) {
+      this->cosemObjectList.push_back(obisElement);
+    }
+    else {
+      obisElement->Reset();
+      delete obisElement;
+    }
+  }
+  return true;
+}
+
+
+// This code is just a sketch to evaluate support for kaifa/kamstrup.
+// Not tested.
+bool HanReader::decodeKaifaKamstrupMeter() {
+  int firstStructurePos = 9;
+  int nextPos = firstStructurePos;
+  // First we get an untyped date time.
+  //  byte dataType = userData[firstStructurePos];
+  byte dateTimeLen = userData[nextPos];
+
+  if (dateTimeLen != 0x0C)
+  {
+    if (debug) debug->println("Error. We expect the first byte to be the date time length.");
+    return false;
+  }
+
+  ObisElement* dateTime = new ObisElement();
+  ClockDeviation* clockDeviation = new ClockDeviation();
+  if (decodeClockAndDeviation((byte*)userData[nextPos+1], *clockDeviation)) {
+    dateTime->data = new Element();
+    dateTime->data->value.value_dateTime = clockDeviation;
+    dateTime->data->dataType = TYPE_DATETIME;
+  }
+  else {
+    delete clockDeviation;
+  }
+  nextPos += 0xC;
+
+  uint8_t structDataType = userData[nextPos]; // 0x02
+  uint8_t structElements = userData[nextPos+1]; // e.g. 0x19
+  if (structDataType != TYPE_STRUCTURE)
+  {
+    if (debug) debug->println("Error. We expect the root element to be a structure.");
+    return false;
+  }
+  /*
+  uint16_t curPos = firstStructurePos + 2;
+  for (int listItemIndex = 0; listItemIndex < listLength; listItemIndex++) {
+    if (debug) debug->print("Decoding element: ");
+    if (debug) debug->println(listItemIndex);
+
+    ObisElement* obisElement = new ObisElement();
+    if (decodeListElement(curPos, obisElement)) {
+      this->cosemObjectList.push_back(obisElement);
+    }
+    else {
+      obisElement->Reset();
+      delete obisElement;
+    }
+  }
+  return true;
+  */
   return false;
 }
 
