@@ -51,14 +51,14 @@ For those of you with a NodeMCU v3 the following pinout shows where RX2 are - D7
 
 The HAN M-Bus TTL adapter can be labeled in a way that either RX or TX means data out from the adapter to the ESP, so you may need to test both, depending on the adapter. Some pictures below are from me testing with a NodeMCU v3 and a ESP32 DevKit v1. You'll always want to use the RX-pin on the ESP.
 
-Kobling på HAN-TTL-Adapter<br />
-<img alt="Kobling på HAN-TTL-Adapter" src="https://user-images.githubusercontent.com/471658/56231918-dd371b00-607f-11e9-91ba-e8e3a770179a.png" width="300">
+Connections on a HAN-TTL-Adapter<br />
+<img alt="Connections on a HAN-TTL-Adapter" src="https://user-images.githubusercontent.com/471658/56231918-dd371b00-607f-11e9-91ba-e8e3a770179a.png" width="300">
 
-Kobling på NodeMCU<br />
-<img alt="Kobling på NodeMCU" src="https://user-images.githubusercontent.com/471658/56231976-ff309d80-607f-11e9-8304-552166852743.png" width="300">
+Connections on a NodeMCU v3<br />
+<img alt="Connections on a NodeMCU v3" src="https://user-images.githubusercontent.com/471658/56231976-ff309d80-607f-11e9-8304-552166852743.png" width="300">
 
-Kobling på ESP32 Devkit V1<br />
-<img alt="Kobling på ESP32 Devkit V1" src="https://user-images.githubusercontent.com/471658/56232114-4dde3780-6080-11e9-9712-e2486150bf8c.png" width="500">
+Connections on a ESP32 Devkit V1<br />
+<img alt="Connections on a ESP32 Devkit V1" src="https://user-images.githubusercontent.com/471658/56232114-4dde3780-6080-11e9-9712-e2486150bf8c.png" width="500">
 
 # !!! Known Issues !!!
 
