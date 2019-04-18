@@ -43,6 +43,9 @@ This means that we need to connect three pins from the ESP32/ESP8266 and the M-B
 * GND
 * GPIO16 (RX2|U2_RXD)
 
+With the ESP32 WROOM32 DevKit the pinout looks like this:
+![image](https://user-images.githubusercontent.com/471658/56369319-6faefa00-61f9-11e9-8834-ed72d7931d6b.png)
+
 ## ESP8266
 
 * PWR 3v3
@@ -55,15 +58,14 @@ For those of you with a NodeMCU v3 the following pinout shows where RX2 are - D7
 
 The HAN M-Bus TTL adapter can be labeled in a way that either RX or TX means data out from the adapter to the ESP, so you may need to test both, depending on the adapter. Some pictures below are from me testing with a NodeMCU v3 and a ESP32 DevKit v1. You'll always want to use the RX-pin on the ESP.
 
-Connections on a HAN-TTL-Adapter<br />
-<img alt="Connections on a HAN-TTL-Adapter" src="https://user-images.githubusercontent.com/471658/56231918-dd371b00-607f-11e9-91ba-e8e3a770179a.png" width="300">
-
-Connections on a NodeMCU v3<br />
-<img alt="Connections on a NodeMCU v3" src="https://user-images.githubusercontent.com/471658/56231976-ff309d80-607f-11e9-8304-552166852743.png" width="300">
-
-Connections on a ESP32 Devkit V1<br />
-<img alt="Connections on a ESP32 Devkit V1" src="https://user-images.githubusercontent.com/471658/56232114-4dde3780-6080-11e9-9712-e2486150bf8c.png" width="500">
-
+<table>
+<tr><td> Connections on a NodeMCU v3<br />
+<img alt="Connections on a NodeMCU v3" src="https://user-images.githubusercontent.com/471658/56231976-ff309d80-607f-11e9-8304-552166852743.png" width="300"> </td><td>Connections on a HAN-TTL-Adapter<br />
+<img alt="Connections on a HAN-TTL-Adapter" src="https://user-images.githubusercontent.com/471658/56231918-dd371b00-607f-11e9-91ba-e8e3a770179a.png" width="300"></td></tr>
+<tr><td colspan=2>Connections on a ESP32 Devkit V1<br />
+<img alt="Connections on a ESP32 Devkit V1" src="https://user-images.githubusercontent.com/471658/56232114-4dde3780-6080-11e9-9712-e2486150bf8c.png" width="500"></td></tr>
+</table>
+ 
 # !!! Known Issues !!!
 
 ## Instability [Status: Mitigated]
