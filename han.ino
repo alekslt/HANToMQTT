@@ -135,6 +135,11 @@ unsigned long now;
 unsigned long lastUpdate = 0;
 unsigned long lastHANMessage = 0;
 
+#if defined(ESP32)
+hw_timer_t *wdTimer = NULL;
+#else
+#endif
+
 
 std::map<String, bool> obisCodesSeen;
 
@@ -195,12 +200,23 @@ void hard_restart() {
   while(true);
 }
 
+#if defined(ESP32)
+void IRAM_ATTR resetModule() {
+  ets_printf("reboot\n");
+  //esp_restart();
+  hard_restart();
+}
+#else
+#endif
+
+
 ////////////////////////////////
 // Setup - Entry point /////////
 ////////////////////////////////
 
 void setup() {
   setupDebugPort();
+  setupWDTimer();
   setupWiFi();
   setupOTA();
   setupNTPClient();
@@ -232,7 +248,12 @@ void loop() {
     delay(100);
     hard_restart();
   }
-
+  
+  #if defined(ESP32)
+  timerWrite(wdTimer, 0); //reset timer (feed watchdog);
+  #else
+  #endif
+  
   delay(10);
 }
 
@@ -261,6 +282,16 @@ void setupDebugPort() {
   //Serial1.setDebugOutput(true);
   //Serial1.println("Serial1");
   //Serial1.println("Serial1 debugging port initialized");
+}
+
+void setupWDTimer() {
+  #if defined(ESP32)
+  wdTimer = timerBegin(0, 80, true);                  //timer 0, div 80
+  timerAttachInterrupt(wdTimer, &resetModule, true);  //attach callback
+  timerAlarmWrite(wdTimer, WATCHDOG_TIMEOUT_PERIOD * 1000, false); //set time in us
+  timerAlarmEnable(wdTimer);                          //enable interrupt
+  #else
+  #endif
 }
 
 void setupWiFi() {
