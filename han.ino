@@ -36,6 +36,7 @@
 extern "C" {
 #include "user_interface.h"
 }
+#include <Ticker.h>
 #endif
 
 
@@ -138,6 +139,7 @@ unsigned long lastHANMessage = 0;
 #if defined(ESP32)
 hw_timer_t *wdTimer = NULL;
 #else
+Ticker wdTicker;
 #endif
 
 
@@ -202,11 +204,17 @@ void hard_restart() {
 
 #if defined(ESP32)
 void IRAM_ATTR resetModule() {
-  ets_printf("reboot\n");
+  ets_printf("wdt reboot\n");
   //esp_restart();
   hard_restart();
 }
 #else
+void wdCheckForSoftHang() {
+  if ((unsigned long)(millis() - lastHANMessage) >= WATCHDOG_TIMEOUT_PERIOD) {
+    ets_printf("wdt reboot\n");
+    hard_restart();
+  } 
+}
 #endif
 
 
@@ -244,6 +252,7 @@ void loop() {
   }
 
   if ((unsigned long)(now - lastHANMessage) >= WATCHDOG_TIMEOUT_PERIOD) {
+    if (debugger) debugger->println("Critical error. No M-Bus data in 60 seconds. Rebooting.");
     mqttClient.publish(power_topic_debug, "Critical error. No M-Bus data in 60 seconds. Rebooting.");
     delay(100);
     hard_restart();
@@ -291,6 +300,7 @@ void setupWDTimer() {
   timerAlarmWrite(wdTimer, WATCHDOG_TIMEOUT_PERIOD * 1000, false); //set time in us
   timerAlarmEnable(wdTimer);                          //enable interrupt
   #else
+  wdTicker.attach(10, wdCheckForSoftHang);
   #endif
 }
 
@@ -301,9 +311,14 @@ void setupWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
+  const int kRetryCountWiFi = 20;
+  int retryCountWiFi = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     if (debugger) debugger->print(".");
+    if (retryCountWiFi++ > kRetryCountWiFi) {
+      hard_restart();
+    }
   }
 
   if (debugger) {
@@ -414,6 +429,8 @@ void loopMqtt()
 //char buf[64];
 
 void reconnectMqtt() {
+  const int kRetryCountMQTT = 40;
+  int retryCountMQTT = 0;
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
     if (debugger) debugger->print("MQTT connection establishing...");
@@ -435,6 +452,9 @@ void reconnectMqtt() {
       if (debugger) debugger->println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
+    }
+    if (retryCountMQTT++ > kRetryCountMQTT) {
+      hard_restart();
     }
   }
 }
