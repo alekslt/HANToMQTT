@@ -185,7 +185,7 @@ void sendBuffer(byte* buf, int len) {
       bytesToWrite = min(bytesRemaining, kMaxBytesToWrite);
       //bytesToWrite = bytesRemaining;
       rc = mqttClient.write(&(buf[bytesWritten]), bytesToWrite);
-      //result = (rc == bytesToWrite);
+      result = (rc == bytesToWrite);
       bytesRemaining -= rc;
       bytesWritten += rc;
     }
