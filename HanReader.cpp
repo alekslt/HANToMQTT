@@ -112,7 +112,7 @@ bool HanReader::decodeDataElement(uint16_t& nextPos, Element& element) {
     nextPos += 3;
   }
   else if (element.dataType == TYPE_INT16) {
-    element.value.value_int = userData[nextPos + 1] << 8 | userData[nextPos + 2];
+    element.value.value_int = (int16_t)(userData[nextPos + 1] << 8 | userData[nextPos + 2]);
     nextPos += 3;
   }
   else if (element.dataType == TYPE_OCTET_STRING) {
